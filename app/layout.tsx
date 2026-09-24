@@ -15,12 +15,18 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "รวมเครื่องมือออนไลน์ฟรี ไม่ต้องสมัครสมาชิก | FreeAppGenTools",
-  description: "รวมเครื่องมือช่วยเหลือออนไลน์ใช้งานฟรี 100% สร้าง QR Code, แปลงไฟล์, เครื่องมือ Developer สะดวก รวดเร็ว ปลอดภัย",
-  keywords: ["เครื่องมือออนไลน์ฟรี", "สร้าง QR Code ฟรี", "free online tools", "freeappgentools"],
+  title: "FreeAppGenTools - สร้าง QR Code ฟรี ไม่ต้องลงทะเบียน ไม่ต้องสมัครสมาชิก",
+  description: "เครื่องมือสร้าง QR Code ออนไลน์ฟรี 100% ไม่ต้องลงทะเบียน ไม่ติดลายน้ำ ใช้งานได้ทันที ปลอดภัย ไม่จำกัดจำนวนครั้ง",
+  keywords: [
+    "สร้าง QR Code ฟรี", 
+    "สร้าง QR Code ไม่ต้องลงทะเบียน", 
+    "สร้าง QR Code ไม่ต้องสมัครสมาชิก", 
+    "free qr code generator no signup", 
+    "FreeAppGenTools"
+  ],
   openGraph: {
-    title: "รวมเครื่องมือออนไลน์ฟรี | FreeAppGenTools",
-    description: "ใช้งานเครื่องมือออนไลน์ฟรี ไม่ติดลายน้ำ ไม่ต้องสมัครสมาชิก",
+    title: "FreeAppGenTools - สร้าง QR Code ฟรี ไม่ต้องลงทะเบียน",
+    description: "ใช้งานเครื่องมือออนไลน์ฟรี ไม่ต้องสมัครสมาชิก ไม่ติดลายน้ำ สร้างเสร็จดาวน์โหลดได้ทันที",
     url: "https://freeappgentools.com",
     siteName: "FreeAppGenTools",
     type: "website",
