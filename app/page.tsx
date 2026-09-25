@@ -19,19 +19,27 @@ export default function Home() {
 
   // สร้าง QR Code อัตโนมัติจาก Link / ข้อความ
   useEffect(() => {
-    async function createQR() {
-      try {
-        const dataToEncode = text || "https://example.com";
-        const url = await QRCode.toDataURL(dataToEncode, {
-          width: 300,
-          margin: 2,
-          color: { dark: "#000000", light: "#ffffff" },
-        });
-        setQrUrl(url);
-      } catch (err) {
-        setQrUrl("");
-      }
+   async function createQR() {
+  try {
+    const dataToEncode = text || "https://example.com";
+    const url = await QRCode.toDataURL(dataToEncode, {
+      width: 300,
+      margin: 2,
+      color: { dark: "#000000", light: "#ffffff" },
+    });
+    setQrUrl(url);
+
+    // 🟢 ส่ง Event ไปยัง GA4 เมื่อสร้าง QR Code สำเร็จ
+    if (typeof window !== "undefined" && (window as any).gtag) {
+      (window as any).gtag("event", "generate_qr", {
+        event_category: "engagement",
+        event_label: tab, // ระบุแท็บที่ใช้งาน (link / donate)
+      });
     }
+  } catch (err) {
+    setQrUrl("");
+  }
+}
 
     if (tab === "link") {
       createQR();
