@@ -5,11 +5,12 @@ import QRCode from "qrcode";
 import Link from "next/link";
 
 export default function Home() {
-  const [tab, setTab] = useState<"link" | "donate">("link");
+  // 1. แก้ไข Type ให้รองรับ "astro"
+  const [tab, setTab] = useState<"link" | "donate" | "astro">("link");
   const [text, setText] = useState("https://example.com");
   const [qrUrl, setQrUrl] = useState("");
 
-  // เบอร์พร้อมเพย์กรุงไทยของคุณสำหรับรับบริจาค
+  // เบอร์พร้อมเพย์กรุงไทยสำหรับรับบริจาค
   const myPromptPayId = "0888501044"; 
 
   // ฟอร์ม Feedback
@@ -19,27 +20,27 @@ export default function Home() {
 
   // สร้าง QR Code อัตโนมัติจาก Link / ข้อความ
   useEffect(() => {
-   async function createQR() {
-  try {
-    const dataToEncode = text || "https://example.com";
-    const url = await QRCode.toDataURL(dataToEncode, {
-      width: 300,
-      margin: 2,
-      color: { dark: "#000000", light: "#ffffff" },
-    });
-    setQrUrl(url);
+    async function createQR() {
+      try {
+        const dataToEncode = text || "https://example.com";
+        const url = await QRCode.toDataURL(dataToEncode, {
+          width: 300,
+          margin: 2,
+          color: { dark: "#000000", light: "#ffffff" },
+        });
+        setQrUrl(url);
 
-    // 🟢 ส่ง Event ไปยัง GA4 เมื่อสร้าง QR Code สำเร็จ
-    if (typeof window !== "undefined" && (window as any).gtag) {
-      (window as any).gtag("event", "generate_qr", {
-        event_category: "engagement",
-        event_label: tab, // ระบุแท็บที่ใช้งาน (link / donate)
-      });
+        // 🟢 ส่ง Event ไปยัง GA4 เมื่อสร้าง QR Code สำเร็จ
+        if (typeof window !== "undefined" && (window as any).gtag) {
+          (window as any).gtag("event", "generate_qr", {
+            event_category: "engagement",
+            event_label: tab,
+          });
+        }
+      } catch (err) {
+        setQrUrl("");
+      }
     }
-  } catch (err) {
-    setQrUrl("");
-  }
-}
 
     if (tab === "link") {
       createQR();
@@ -53,8 +54,8 @@ export default function Home() {
 
     setIsSubmitting(true);
 
-    // 🔗 นำ Web app URL ที่คัดลอกมาจาก Google Apps Script มาวางแทนที่บรรทัดนี้
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbyuRCyObdlaKuYEwJRwvqBle8-Q3sLbw3ixuSHyoAJHwaftIJQPjjibR6u0aQNj4btW/exec";
+    const scriptUrl =
+      "https://script.google.com/macros/s/AKfycbyuRCyObdlaKuYEwJRwvqBle8-Q3sLbw3ixuSHyoAJHwaftIJQPjjibR6u0aQNj4btW/exec";
 
     try {
       await fetch(scriptUrl, {
@@ -92,28 +93,43 @@ export default function Home() {
         {/* ปุ่มสลับ Tab */}
         <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
           <button
+            type="button"
             onClick={() => setTab("link")}
             className={`flex-1 py-2 text-sm font-semibold rounded-lg transition ${
               tab === "link"
                 ? "bg-white text-blue-600 shadow-sm"
-                : "text-slate-600"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             สร้าง QR Code (Link)
           </button>
+
           <button
+            type="button"
+            onClick={() => setTab("astro")}
+            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition ${
+              tab === "astro"
+                ? "bg-white text-blue-600 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            🌟 ดวงดาว
+          </button>
+
+          <button
+            type="button"
             onClick={() => setTab("donate")}
             className={`flex-1 py-2 text-sm font-semibold rounded-lg transition ${
               tab === "donate"
                 ? "bg-white text-amber-600 shadow-sm"
-                : "text-slate-600"
+                : "text-slate-600 hover:text-slate-900"
             }`}
           >
             ☕ สนับสนุนผู้พัฒนา
           </button>
         </div>
 
-        {/* เนื้อหาตาม Tab */}
+        {/* 2. แก้ไขการเช็คเงื่อนไข Tab ด้วย Nested Ternary ที่ถูกต้อง */}
         {tab === "link" ? (
           <div>
             {/* ฟอร์มกรอก Link */}
@@ -135,7 +151,11 @@ export default function Home() {
             {/* แสดงผล QR Code */}
             <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-4 min-h-[220px] flex items-center justify-center mb-4">
               {qrUrl ? (
-                <img src={qrUrl} alt="Generated QR Code" className="w-48 h-48" />
+                <img
+                  src={qrUrl}
+                  alt="Generated QR Code"
+                  className="w-48 h-48"
+                />
               ) : (
                 <p className="text-xs text-slate-400">กำลังสร้าง QR Code...</p>
               )}
@@ -151,11 +171,8 @@ export default function Home() {
                 ดาวน์โหลดรูปภาพ (PNG)
               </a>
             )}
-            <a href="/astro" className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition mb-6">
-              ไปยังหน้า ดวงดาว
-            </a>
           </div>
-        ) : (
+        ) : tab === "donate" ? (
           /* Tab สนับสนุนผู้พัฒนา */
           <div className="bg-amber-50/60 p-5 rounded-2xl border border-amber-200/60 mb-6">
             <h3 className="font-bold text-amber-800 text-base mb-1">
@@ -171,11 +188,28 @@ export default function Home() {
                 className="w-44 h-44 rounded-xl shadow-md border bg-white p-2"
               />
             </div>
-            <p className="text-[11px] text-slate-400">พร้อมเพย์ ธนาคารกรุงไทย</p>
+            <p className="text-[11px] text-slate-400">
+              พร้อมเพย์ ธนาคารกรุงไทย
+            </p>
+          </div>
+        ) : (
+          /* Tab ดวงดาว */
+          <div className="bg-amber-50/60 p-5 rounded-2xl border border-amber-200/60 mb-6">
+            <h3 className="font-bold text-amber-800 text-base mb-1">
+              🌟 ดวงดาว
+            </h3>
+            <div className="flex justify-center mb-2">
+              <Link
+                href="/astro"
+                className="text-blue-600 hover:underline text-sm font-medium"
+              >
+                ดูดาว Astro
+              </Link>
+            </div>
           </div>
         )}
 
-        {/* ฟอร์ม Feedback ขอฟังก์ชันฟรีเพิ่ม */}
+        {/* ฟอร์ม Feedback */}
         <div className="border-t pt-5 mt-2 text-left">
           <h4 className="text-xs font-bold text-slate-700 mb-1">
             💡 อยากได้เครื่องมือฟรีอะไรเพิ่มอีกไหม?
@@ -208,14 +242,17 @@ export default function Home() {
           )}
         </div>
 
-        {/* Footer เพิ่มความน่าเชื่อถือ */}
+        {/* Footer */}
         <footer className="mt-8 border-t pt-4 text-center text-[11px] text-slate-400 space-y-2">
           <p className="flex items-center justify-center gap-1">
             <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
             ปลอดภัย 100% • ประมวลผลบนเครื่องของคุณ ไม่มีการบันทึกข้อมูลลงเซิร์ฟเวอร์
           </p>
           <div className="flex justify-center gap-4 text-slate-500 font-medium">
-            <Link href="/privacy" className="hover:underline hover:text-blue-600">
+            <Link
+              href="/privacy"
+              className="hover:underline hover:text-blue-600"
+            >
               นโยบายความเป็นส่วนตัว
             </Link>
             <span>•</span>
@@ -223,11 +260,17 @@ export default function Home() {
               เงื่อนไขการใช้งาน
             </Link>
             <span>•</span>
-            <Link href="/contact" className="hover:underline hover:text-blue-600">
+            <Link
+              href="/contact"
+              className="hover:underline hover:text-blue-600"
+            >
               ติดต่อเรา
             </Link>
           </div>
-          <p>© {new Date().getFullYear()} Thai Free Utility Tools. All rights reserved.</p>
+          <p>
+            © {new Date().getFullYear()} Thai Free Utility Tools. All rights
+            reserved.
+          </p>
         </footer>
       </div>
     </main>

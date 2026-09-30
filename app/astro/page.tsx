@@ -98,6 +98,11 @@ export default async function AstroPage({ searchParams }: Props) {
           ข้อมูล JSON
         </a>
       </p>
+        <p className="mt-3 text-sm text-neutral-500">
+        <a className="underline" href={`./`}>
+          กลับหน้าแรก
+        </a>
+      </p>
     </main>
   );
 }
