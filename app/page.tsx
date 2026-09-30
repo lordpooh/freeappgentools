@@ -151,6 +151,9 @@ export default function Home() {
                 ดาวน์โหลดรูปภาพ (PNG)
               </a>
             )}
+            <a href="/astro" className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-lg text-sm transition mb-6">
+              ไปยังหน้า ดวงดาว
+            </a>
           </div>
         ) : (
           /* Tab สนับสนุนผู้พัฒนา */
