@@ -150,6 +150,11 @@ export default async function AstroPage({ searchParams }: Props) {
         คำนวณจากเวลามาตรฐานไทย (UTC+7) ทุกวันที่ หากเป็นดวงก่อน พ.ศ. 2463 ซึ่งไทยยังใช้เวลาท้องถิ่น
         เวลาที่ใช้ต้องปรับเอง
       </p>
+      <p className="mt-2 text-xs text-neutral-500">
+        <a className="underline" href="./"  rel="noopener noreferrer">
+          กลับหน้าแรก
+        </a>
+      </p>
     </main>
   );
 }
