@@ -6,6 +6,7 @@ import {
   THAI_PLANETS,
   THAI_ZODIACS,
   type ChartResult,
+  type Location,
   type PlanetInfo,
 } from "./thai-astro";
 
@@ -89,7 +90,11 @@ function splitLongitude(long: number) {
   return { zodiac: THAI_ZODIACS[zIdx], degree, minute, second };
 }
 
-export async function computeChart(date: string, time: string): Promise<ChartResult> {
+export async function computeChart(
+  date: string,
+  time: string,
+  loc: Location
+): Promise<ChartResult> {
   const swe = await getSwe();
 
   const [year, month, day] = date.split("-").map(Number);
@@ -140,11 +145,23 @@ export async function computeChart(date: string, time: string): Promise<ChartRes
     status: "ปกติ",
   };
 
+  // ลัคนา: จุดที่ราศีขึ้นที่ขอบฟ้าตะวันออก ณ สถานที่และเวลานั้น (นิรายนะ)
+  // ใช้ flag SIDEREAL กับ whole-sign ('W') แล้วอ่านค่า ascmc[0]
+  const houses = swe.swe_houses_ex(jd, 65536, loc.lat, loc.lon, "W");
+  const ascLong = (((houses.ascmc[0] as number) % 360) + 360) % 360;
+  const l = splitLongitude(ascLong);
+
   return {
     datetime_th: `${date} ${time}`,
     julian_day: jd,
     system: "Sidereal (Lahiri Ayanamsa)",
     ayanamsa: swe.swe_get_ayanamsa_ut(jd),
+    location: loc,
+    lagna: {
+      longitude: Number(ascLong.toFixed(4)),
+      ...l,
+      formatted: `${l.zodiac} ${l.degree}° ${l.minute}' ${l.second}"`,
+    },
     planets,
   };
 }
