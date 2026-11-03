@@ -337,7 +337,7 @@ export default function ThaiWheel({ chart }: { chart: ChartResult }) {
           {lagLabel}
         </text>
         <text x={C} y={C + 44} fontSize={11} className="fill-[#8a7a58] dark:fill-[#a39a86]">
-          ลาหิรี {fmtAyanamsa(chart.ayanamsa)}
+          ลาหิรี {fmtAyanamsa((chartResult as any)?.ayanamsa ?? 0)}
         </text>
         <text x={C} y={C + 59} fontSize={11} className="fill-[#c0392b] dark:fill-[#ff8a7a]">
           R = พักร

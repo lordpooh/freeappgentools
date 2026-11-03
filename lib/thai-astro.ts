@@ -11,6 +11,7 @@ export type PlanetInfo = {
   formatted: string;
   speed_per_day: number;
   status: string;
+  ayanamsa?: number;
 };
 
 /** province = ชื่อจังหวัดเต็มตามที่ไลบรารี thai-astrology รู้จัก (ถ้ามี) ใช้หาอาทิตย์ขึ้นและเวลาท้องถิ่น */
