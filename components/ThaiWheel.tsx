@@ -19,9 +19,9 @@ const R_OUT = 335; // ขอบนอกวงเลของศา
 const R_DEG_IN = 313; // ขอบในวงเลของศา = ขอบนอกวงชื่อราศี
 const R_SIGN_IN = 282; // ขอบในวงชื่อราศี
 const LANES = [258, 220, 182]; // รัศมีวางดาว ใช้หลายชั้นเมื่อดาวอยู่ใกล้กัน
-const R_CENTER = 150; // วงกลมกลาง (ผังราศี + นวางค์)
-const R_RASI = 100; // ขอบนอกผังราศี (วงในสุด) ; ระหว่าง R_RASI ถึง R_CENTER = ผังนวางค์
-const R_CORE = 40; // วงกลางสุด แสดงองศาอาทิตย์
+const R_CENTER = 160; // วงกลมกลาง (ผังราศี + นวางค์)
+const R_RASI = 112; // ขอบนอกผังราศี (วงในสุด) ; ระหว่าง R_RASI ถึง R_CENTER = ผังนวางค์
+const H = 30; // ครึ่งความกว้างช่องสี่เหลี่ยมกลางผังราศี (แสดงองศาอาทิตย์)
 const MARK_R = 14;
 const MARK_HALF_W = 16; // ครึ่งความกว้างที่ดาวหนึ่งดวงกินที่ ใช้คำนวณระยะห่างขั้นต่ำ
 
@@ -51,6 +51,76 @@ function readable(rot: number) {
   let r = ((rot % 360) + 360) % 360;
   if (r > 180) r -= 360;
   return Math.abs(r) > 90 ? r + 180 : r;
+}
+
+type Sym = { s: string; kind: "lag" | "mod" | "std" };
+const SYM_CLASS = {
+  lag: "fill-[#0f766e] dark:fill-[#5eead4]",
+  mod: "fill-[#1d4ed8] dark:fill-[#60a5fa]",
+  std: "fill-[#1f2937] dark:fill-[#eee7d8]",
+};
+
+// ตำแหน่งกึ่งกลางของแต่ละภพในผังราศีแบบไทย ("#" + เส้นทแยงจากมุมช่องกลาง = 12 ภพ)
+// เมษ = ช่องบน, กรกฎ = ช่องซ้าย, ตุลย์ = ช่องล่าง, มังกร = ช่องขวา ; ที่เหลือคือสามเหลี่ยมในมุมทั้งสี่ (มุมละ 2 ช่อง)
+const S22 = Math.sin(Math.PI / 8);
+const C22 = Math.cos(Math.PI / 8);
+function rasiCellCenter(z: number): [number, number] {
+  const rr = (H + R_RASI * 0.96) / 2;
+  if (z === 0) return [C, C - rr];
+  if (z === 3) return [C - rr, C];
+  if (z === 6) return [C, C + rr];
+  if (z === 9) return [C + rr, C];
+  const sx = z < 6 ? -1 : 1;
+  const sy = z === 1 || z === 2 || z === 10 || z === 11 ? -1 : 1;
+  const nearVertical = z === 1 || z === 5 || z === 7 || z === 11; // ติดช่องบน/ล่าง
+  const ux = sx * (nearVertical ? S22 : C22);
+  const uy = sy * (nearVertical ? C22 : S22);
+  const cx0 = sx * H;
+  const cy0 = sy * H;
+  const b = cx0 * ux + cy0 * uy;
+  const d = -b + Math.sqrt(b * b - (cx0 * cx0 + cy0 * cy0 - R_RASI * R_RASI));
+  return [C + cx0 + ux * d * 0.5, C + cy0 + uy * d * 0.5];
+}
+
+function SymText({
+  x,
+  y,
+  syms,
+  size,
+  weight,
+  rot = 0,
+}: {
+  x: number;
+  y: number;
+  syms: Sym[];
+  size: number;
+  weight: number;
+  rot?: number;
+}) {
+  const half = Math.ceil(syms.length / 2);
+  const lines = syms.length > 3 ? [syms.slice(0, half), syms.slice(half)] : [syms];
+  const lh = size * 1.15;
+  return (
+    <text
+      x={f(x)}
+      y={f(y - ((lines.length - 1) * lh) / 2)}
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontSize={size}
+      fontWeight={weight}
+      transform={rot ? `rotate(${f(rot)} ${f(x)} ${f(y)})` : undefined}
+    >
+      {lines.map((ln, i) => (
+        <tspan key={i} x={f(x)} dy={i === 0 ? 0 : lh}>
+          {ln.map((q, j) => (
+            <tspan key={j} className={SYM_CLASS[q.kind]}>
+              {q.s}
+            </tspan>
+          ))}
+        </tspan>
+      ))}
+    </text>
+  );
 }
 
 type Placed = { p: PlanetInfo; lane: number; disp: number };
@@ -102,17 +172,20 @@ export default function ThaiWheel({ chart }: { chart: ChartResult }) {
   const planets = DISPLAY_ORDER.map((c) => chart.planets[c]);
   const placed = layoutPlanets(planets);
 
-  // ผังราศีและนวางค์: ช่องละ 1 ราศี (เมษอยู่บนสุด) เก็บเลขดาวที่อยู่ในช่อง
-  const rasi: string[][] = THAI_ZODIACS.map(() => []);
-  const nav: string[][] = THAI_ZODIACS.map(() => []);
+  // ผังราศีและนวางค์: ช่องละ 1 ราศี (เมษอยู่บนสุด) เก็บสัญลักษณ์ดาวที่อยู่ในช่อง
+  const rasi: Sym[][] = THAI_ZODIACS.map(() => []);
+  const nav: Sym[][] = THAI_ZODIACS.map(() => []);
+  const lagRasi = THAI_ZODIACS.indexOf(chart.lagna.zodiac);
+  const lagNav = navamsaSign(chart.lagna.longitude);
+  if (lagRasi >= 0) rasi[lagRasi].push({ s: "ล", kind: "lag" });
+  nav[lagNav].push({ s: "ล", kind: "lag" });
   for (const code of DISPLAY_ORDER) {
     const p = chart.planets[code];
     const z = THAI_ZODIACS.indexOf(p.zodiac);
-    if (z >= 0) rasi[z].push(planetSymbol(code));
-    nav[navamsaSign(p.longitude)].push(planetSymbol(code));
+    const kind = code === "N" || code === "P" ? "mod" : "std";
+    if (z >= 0) rasi[z].push({ s: planetSymbol(code), kind });
+    nav[navamsaSign(p.longitude)].push({ s: planetSymbol(code), kind });
   }
-  const lagRasi = THAI_ZODIACS.indexOf(chart.lagna.zodiac);
-  const lagNav = navamsaSign(chart.lagna.longitude);
   const sun = chart.planets["1"];
 
   // ลัคนา
@@ -325,47 +398,56 @@ export default function ThaiWheel({ chart }: { chart: ChartResult }) {
         );
       })}
 
-      {/* วงกลมกลาง: วงในสุด = ผังราศี, วงนอก = ผังนวางค์, กลางสุด = องศาอาทิตย์ */}
-      <circle cx={C} cy={C} r={R_CENTER} strokeWidth={1.5} className={`fill-[#f6ecd6] dark:fill-[#2a2314] ${GOLD_STROKE}`} />
-      <circle cx={C} cy={C} r={R_RASI} strokeWidth={1.2} className={`fill-[#fffdf7] dark:fill-[#1a160f] ${GOLD_STROKE}`} />
-      <circle cx={C} cy={C} r={R_CORE} strokeWidth={1.2} className={`fill-[#f6ecd6] dark:fill-[#2a2314] ${GOLD_STROKE}`} />
+      {/* วงกลมกลาง: ในสุด = ผังราศี (12 ภพ), วงนอก = ผังนวางค์ */}
+      <circle cx={C} cy={C} r={R_CENTER} strokeWidth={1.5} className={`fill-[#fffdf7] dark:fill-[#1a160f] ${GOLD_STROKE}`} />
+      {/* เส้นแบ่งราศีในวงนอก (นวางค์) */}
       {THAI_ZODIACS.map((_, z) => {
-        const [x1, y1] = pt(R_CORE, toTheta(z * 30));
+        const [x1, y1] = pt(R_RASI, toTheta(z * 30));
         const [x2, y2] = pt(R_CENTER, toTheta(z * 30));
-        return (
-          <line key={`cl-${z}`} x1={f(x1)} y1={f(y1)} x2={f(x2)} y2={f(y2)} strokeWidth={0.8} className={GOLD_STROKE} />
-        );
+        return <line key={`rl-${z}`} x1={f(x1)} y1={f(y1)} x2={f(x2)} y2={f(y2)} strokeWidth={0.8} className={GOLD_STROKE} />;
       })}
+      <circle cx={C} cy={C} r={R_RASI} strokeWidth={1.5} className="fill-[#fffdf7] stroke-[#374151] dark:fill-[#1a160f] dark:stroke-[#9ca3af]" />
+      {/* เส้น "#" และเส้นทแยงจากมุมช่องกลาง */}
+      {(() => {
+        const e = Math.sqrt(R_RASI * R_RASI - H * H);
+        const dg = (() => {
+          const b = H * Math.SQRT2;
+          return -b + Math.sqrt(b * b - (2 * H * H - R_RASI * R_RASI));
+        })();
+        const k = dg / Math.SQRT2;
+        const L = "stroke-[#374151] dark:stroke-[#9ca3af]";
+        const lines: [number, number, number, number][] = [
+          [C - H, C - e, C - H, C + e],
+          [C + H, C - e, C + H, C + e],
+          [C - e, C - H, C + e, C - H],
+          [C - e, C + H, C + e, C + H],
+          [C - H, C - H, C - H - k, C - H - k],
+          [C + H, C - H, C + H + k, C - H - k],
+          [C - H, C + H, C - H - k, C + H + k],
+          [C + H, C + H, C + H + k, C + H + k],
+        ];
+        return lines.map(([x1, y1, x2, y2], n) => (
+          <line key={`g-${n}`} x1={f(x1)} y1={f(y1)} x2={f(x2)} y2={f(y2)} strokeWidth={1.2} className={L} />
+        ));
+      })()}
       {THAI_ZODIACS.map((name, z) => {
+        const [rx, ry] = rasiCellCenter(z);
         const tc = toTheta(z * 30 + 15);
-        const [rx, ry] = pt(70, tc);
-        const [nx, ny] = pt(125, tc);
-        const isLagRasi = z === lagRasi;
-        const isLagNav = z === lagNav;
+        const [nx, ny] = pt((R_RASI + R_CENTER) / 2, tc);
         return (
           <g key={`c-${z}`}>
-            <title>{`${name} — ราศี: ${rasi[z].join(" ") || "-"} · นวางค์: ${nav[z].join(" ") || "-"}`}</title>
-            {(rasi[z].length > 0 || isLagRasi) && (
-              <text x={f(rx)} y={f(ry)} textAnchor="middle" dominantBaseline="central" fontSize={16} fontWeight={700} className="fill-[#1e3a8a] dark:fill-[#93c5fd]">
-                {isLagRasi && <tspan className="fill-[#0f766e] dark:fill-[#5eead4]">ล</tspan>}
-                {rasi[z].join("")}
-              </text>
-            )}
-            {(nav[z].length > 0 || isLagNav) && (
-              <text x={f(nx)} y={f(ny)} textAnchor="middle" dominantBaseline="central" fontSize={14} fontWeight={600} className="fill-[#1e3a8a]/80 dark:fill-[#93c5fd]/80">
-                {isLagNav && <tspan className="fill-[#0f766e] dark:fill-[#5eead4]">ล</tspan>}
-                {nav[z].join("")}
-              </text>
-            )}
+            <title>{`${name} — ราศี: ${rasi[z].map((q) => q.s).join(" ") || "-"} · นวางค์: ${nav[z].map((q) => q.s).join(" ") || "-"}`}</title>
+            {rasi[z].length > 0 && <SymText x={rx} y={ry} syms={rasi[z]} size={15} weight={600} />}
+            {nav[z].length > 0 && <SymText x={nx} y={ny} syms={nav[z]} size={14} weight={600} rot={readable(tc)} />}
           </g>
         );
       })}
-      <g textAnchor="middle" className="fill-[#1e3a8a] dark:fill-[#93c5fd]">
+      <g textAnchor="middle" className="fill-[#1f2937] dark:fill-[#eee7d8]">
         <title>{`อาทิตย์ ${sun.zodiac} ${sun.degree}°${String(sun.minute).padStart(2, "0")}′`}</title>
-        <text x={C} y={C - 5} fontSize={15} fontWeight={600}>
+        <text x={C} y={C - 4} fontSize={14}>
           {sun.degree}°
         </text>
-        <text x={C} y={C + 13} fontSize={15} fontWeight={600}>
+        <text x={C} y={C + 13} fontSize={14}>
           {String(sun.minute).padStart(2, "0")}′
         </text>
       </g>
