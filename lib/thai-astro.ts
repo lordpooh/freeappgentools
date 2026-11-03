@@ -11,7 +11,6 @@ export type PlanetInfo = {
   formatted: string;
   speed_per_day: number;
   status: string;
-  ayanamsa?: number;
 };
 
 /** province = ชื่อจังหวัดเต็มตามที่ไลบรารี thai-astrology รู้จัก (ถ้ามี) ใช้หาอาทิตย์ขึ้นและเวลาท้องถิ่น */
@@ -70,6 +69,17 @@ export function planetSymbol(code: string): string {
   return code === "N" ? "น" : code === "P" ? "พ" : code;
 }
 
+// นวางค์: แบ่งราศีละ 9 ส่วน ส่วนละ 3°20′ เริ่มนับจากราศีตามธาตุ
+// ไฟ (เมษ สิงห์ ธนู) เริ่มเมษ / ดิน (พฤษภ กันย์ มังกร) เริ่มมังกร / ลม (เมถุน ตุลย์ กุมภ์) เริ่มตุลย์ / น้ำ (กรกฎ พิจิก มีน) เริ่มกรกฎ
+// คืนค่าเลขราศี 0-11 (เมษ = 0)
+const NAVAMSA_START = [0, 9, 6, 3];
+export function navamsaSign(longitude: number): number {
+  const arcMin = Math.floor(longitude * 60 + 1e-6); // ลิปดาจากเมษ 0°
+  const sign = ((Math.floor(arcMin / 1800) % 12) + 12) % 12;
+  const part = Math.floor((arcMin % 1800) / 200); // 200 ลิปดา = 3°20′
+  return (NAVAMSA_START[sign % 4] + part) % 12;
+}
+
 export function isRetrograde(p: PlanetInfo): boolean {
   return p.status.startsWith("พักร");
 }
@@ -107,8 +117,10 @@ type RawInput = {
 
 /** ตรวจ date=YYYY-MM-DD, time=HH:MM[:SS], place=<key> หรือ lat/lon (กรอกคู่กัน) */
 export function parseInput(p: RawInput) {
-  const date = p.date || new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
-  const t = p.time || "07:00:00";
+  // ค่าเริ่มต้น = วันและเวลาปัจจุบันตามเวลาไทย (UTC+7)
+  const nowTh = new Date(Date.now() + 7 * 3600_000).toISOString();
+  const date = p.date || nowTh.slice(0, 10);
+  const t = p.time || nowTh.slice(11, 16);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}(:\d{2})?$/.test(t)) return null;
 
   let loc: Location = PLACES[0];

@@ -129,6 +129,9 @@ export default async function AstroPage({ searchParams }: Props) {
         <button type="submit" className="rounded-lg bg-[#8a6d3b] px-4 py-2 text-white hover:bg-[#75592c]">
           แสดงดวง
         </button>
+        <a className="px-1 py-2 text-sm underline" href="/astro">
+          ใช้เวลาปัจจุบัน
+        </a>
       </form>
       <p className="mb-4 text-xs text-neutral-500">
         เทียบกับปฏิทินโหราศาสตร์ที่แสดง &quot;สมผุส ณ เวลา 24:00น.&quot; ของวันที่ D: ให้ใส่วันถัดไป (D+1) เวลา 00:18
@@ -192,8 +195,13 @@ export default async function AstroPage({ searchParams }: Props) {
           </p>
         </section>
 
-        <div className="rounded-xl border border-neutral-200 p-2 dark:border-neutral-800">
-          <ThaiWheel chart={chart} />
+        <div>
+          <div className="rounded-xl border border-neutral-200 p-2 dark:border-neutral-800">
+            <ThaiWheel chart={chart} />
+          </div>
+          <p className="mt-2 text-xs text-neutral-500">
+            ตรงกลาง: วงใน = ผังราศี, วงนอก = ผังนวางค์ (ล = ลัคนา) · กลางสุด = องศาอาทิตย์ · พ. = พักร, ม. = มนต์
+          </p>
         </div>
       </div>
 

@@ -2,6 +2,7 @@ import {
   DISPLAY_ORDER,
   THAI_ZODIACS,
   isRetrograde,
+  navamsaSign,
   planetSymbol,
   type ChartResult,
   type PlanetInfo,
@@ -18,7 +19,9 @@ const R_OUT = 335; // ขอบนอกวงเลของศา
 const R_DEG_IN = 313; // ขอบในวงเลของศา = ขอบนอกวงชื่อราศี
 const R_SIGN_IN = 282; // ขอบในวงชื่อราศี
 const LANES = [258, 220, 182]; // รัศมีวางดาว ใช้หลายชั้นเมื่อดาวอยู่ใกล้กัน
-const R_CENTER = 146; // วงกลมกลาง
+const R_CENTER = 150; // วงกลมกลาง (ผังราศี + นวางค์)
+const R_RASI = 100; // ขอบนอกผังราศี (วงในสุด) ; ระหว่าง R_RASI ถึง R_CENTER = ผังนวางค์
+const R_CORE = 40; // วงกลางสุด แสดงองศาอาทิตย์
 const MARK_R = 14;
 const MARK_HALF_W = 16; // ครึ่งความกว้างที่ดาวหนึ่งดวงกินที่ ใช้คำนวณระยะห่างขั้นต่ำ
 
@@ -98,7 +101,19 @@ const GOLD_STROKE = "stroke-[#8a6d3b] dark:stroke-[#b38b45]";
 export default function ThaiWheel({ chart }: { chart: ChartResult }) {
   const planets = DISPLAY_ORDER.map((c) => chart.planets[c]);
   const placed = layoutPlanets(planets);
-  const [date, time] = chart.datetime_th.split(" ");
+
+  // ผังราศีและนวางค์: ช่องละ 1 ราศี (เมษอยู่บนสุด) เก็บเลขดาวที่อยู่ในช่อง
+  const rasi: string[][] = THAI_ZODIACS.map(() => []);
+  const nav: string[][] = THAI_ZODIACS.map(() => []);
+  for (const code of DISPLAY_ORDER) {
+    const p = chart.planets[code];
+    const z = THAI_ZODIACS.indexOf(p.zodiac);
+    if (z >= 0) rasi[z].push(planetSymbol(code));
+    nav[navamsaSign(p.longitude)].push(planetSymbol(code));
+  }
+  const lagRasi = THAI_ZODIACS.indexOf(chart.lagna.zodiac);
+  const lagNav = navamsaSign(chart.lagna.longitude);
+  const sun = chart.planets["1"];
 
   // ลัคนา
   const lag = chart.lagna;
@@ -264,9 +279,10 @@ export default function ThaiWheel({ chart }: { chart: ChartResult }) {
       {placed.map(({ p, lane, disp }) => {
         const [x, y] = pt(LANES[lane], toTheta(disp));
         const retro = isRetrograde(p);
+        const slow = p.status.startsWith("มนต์");
         return (
           <g key={p.code}>
-            <title>{`${p.name} ${p.formatted}${retro ? " — พักร" : ""}`}</title>
+            <title>{`${p.name} ${p.formatted}${retro ? " — พักร" : slow ? " — มนต์" : ""}`}</title>
             <circle cx={f(x)} cy={f(y)} r={MARK_R} className="fill-[#1d4ed8] dark:fill-[#2563eb]" />
             <text
               x={f(x)}
@@ -279,42 +295,78 @@ export default function ThaiWheel({ chart }: { chart: ChartResult }) {
             >
               {planetSymbol(p.code)}
             </text>
-            {retro && (
-              <text
-                x={f(x)}
-                y={f(y - MARK_R - 3)}
-                textAnchor="middle"
-                fontSize={12}
-                fontWeight={700}
-                className="fill-[#dc2626] dark:fill-[#ff8a7a]"
-              >
-                พ.
-              </text>
+            {(retro || slow) && (
+              <g>
+                <circle
+                  cx={f(x + 11)}
+                  cy={f(y - 11)}
+                  r={7.5}
+                  strokeWidth={1}
+                  className={
+                    retro
+                      ? "fill-[#dc2626] stroke-white dark:fill-[#ef4444] dark:stroke-[#17130d]"
+                      : "fill-[#8a6d3b] stroke-white dark:fill-[#b38b45] dark:stroke-[#17130d]"
+                  }
+                />
+                <text
+                  x={f(x + 11)}
+                  y={f(y - 10.5)}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={9}
+                  fontWeight={700}
+                  className="fill-white"
+                >
+                  {retro ? "พ" : "ม"}
+                </text>
+              </g>
             )}
           </g>
         );
       })}
 
-      {/* วงกลมกลาง */}
+      {/* วงกลมกลาง: วงในสุด = ผังราศี, วงนอก = ผังนวางค์, กลางสุด = องศาอาทิตย์ */}
       <circle cx={C} cy={C} r={R_CENTER} strokeWidth={1.5} className={`fill-[#f6ecd6] dark:fill-[#2a2314] ${GOLD_STROKE}`} />
-      <g textAnchor="middle" className="fill-[#5b4a2a] dark:fill-[#d9cba8]">
-        <text x={C} y={C - 44} fontSize={24} fontWeight={700} className="fill-[#5b3f10] dark:fill-[#f0d9a0]">
-          ดวงชะตาไทย
+      <circle cx={C} cy={C} r={R_RASI} strokeWidth={1.2} className={`fill-[#fffdf7] dark:fill-[#1a160f] ${GOLD_STROKE}`} />
+      <circle cx={C} cy={C} r={R_CORE} strokeWidth={1.2} className={`fill-[#f6ecd6] dark:fill-[#2a2314] ${GOLD_STROKE}`} />
+      {THAI_ZODIACS.map((_, z) => {
+        const [x1, y1] = pt(R_CORE, toTheta(z * 30));
+        const [x2, y2] = pt(R_CENTER, toTheta(z * 30));
+        return (
+          <line key={`cl-${z}`} x1={f(x1)} y1={f(y1)} x2={f(x2)} y2={f(y2)} strokeWidth={0.8} className={GOLD_STROKE} />
+        );
+      })}
+      {THAI_ZODIACS.map((name, z) => {
+        const tc = toTheta(z * 30 + 15);
+        const [rx, ry] = pt(70, tc);
+        const [nx, ny] = pt(125, tc);
+        const isLagRasi = z === lagRasi;
+        const isLagNav = z === lagNav;
+        return (
+          <g key={`c-${z}`}>
+            <title>{`${name} — ราศี: ${rasi[z].join(" ") || "-"} · นวางค์: ${nav[z].join(" ") || "-"}`}</title>
+            {(rasi[z].length > 0 || isLagRasi) && (
+              <text x={f(rx)} y={f(ry)} textAnchor="middle" dominantBaseline="central" fontSize={16} fontWeight={700} className="fill-[#1e3a8a] dark:fill-[#93c5fd]">
+                {isLagRasi && <tspan className="fill-[#0f766e] dark:fill-[#5eead4]">ล</tspan>}
+                {rasi[z].join("")}
+              </text>
+            )}
+            {(nav[z].length > 0 || isLagNav) && (
+              <text x={f(nx)} y={f(ny)} textAnchor="middle" dominantBaseline="central" fontSize={14} fontWeight={600} className="fill-[#1e3a8a]/80 dark:fill-[#93c5fd]/80">
+                {isLagNav && <tspan className="fill-[#0f766e] dark:fill-[#5eead4]">ล</tspan>}
+                {nav[z].join("")}
+              </text>
+            )}
+          </g>
+        );
+      })}
+      <g textAnchor="middle" className="fill-[#1e3a8a] dark:fill-[#93c5fd]">
+        <title>{`อาทิตย์ ${sun.zodiac} ${sun.degree}°${String(sun.minute).padStart(2, "0")}′`}</title>
+        <text x={C} y={C - 5} fontSize={15} fontWeight={600}>
+          {sun.degree}°
         </text>
-        <text x={C} y={C - 16} fontSize={15}>
-          {date}
-        </text>
-        <text x={C} y={C + 6} fontSize={15}>
-          {time.slice(0, 5)} น. (เวลาไทย)
-        </text>
-        <text x={C} y={C + 34} fontSize={16} fontWeight={700} className="fill-[#0f766e] dark:fill-[#5eead4]">
-          {lagLabel}
-        </text>
-        <text x={C} y={C + 60} fontSize={12} className="fill-[#8a7a58] dark:fill-[#a39a86]">
-          คัมภีร์สุริยยาตร์
-        </text>
-        <text x={C} y={C + 78} fontSize={12} className="fill-[#dc2626] dark:fill-[#ff8a7a]">
-          พ. = พักร
+        <text x={C} y={C + 13} fontSize={15} fontWeight={600}>
+          {String(sun.minute).padStart(2, "0")}′
         </text>
       </g>
     </svg>
