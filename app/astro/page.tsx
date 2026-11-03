@@ -1,11 +1,18 @@
 import type { Metadata } from "next";
 import ThaiWheel from "../../components/ThaiWheel";
 import { computeChart } from "../../lib/ephemeris";
-import { DISPLAY_ORDER, PLACES, parseInput, planetSymbol } from "../../lib/thai-astro";
+import {
+  DISPLAY_ORDER,
+  PLACES,
+  THAI_ZODIACS,
+  parseInput,
+  planetSymbol,
+  type ChartResult,
+} from "../../lib/thai-astro";
 
 export const metadata: Metadata = {
   title: "ผังดวงชะตาไทย",
-  description: "คำนวณตำแหน่งดาวและลัคนาระบบนิรายนะ (ลาหิรี) แสดงบนผังดวงไทยแบบวงกลม",
+  description: "คำนวณตำแหน่งดาวและลัคนาตามคัมภีร์สุริยยาตร์ แสดงบนผังดวงไทยแบบวงกลม",
 };
 
 type Props = {
@@ -14,6 +21,15 @@ type Props = {
 
 const inputCls =
   "rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-base text-inherit dark:border-neutral-700";
+
+const THAI_MONTHS = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+// ตัวย่อราศีแบบปฏิทิน (เมษ = 00)
+const SIGN_ABBR = ["มษ", "พภ", "มถ", "กฎ", "สห", "กน", "ตล", "พจ", "ธน", "มก", "กภ", "มน"];
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
 
 export default async function AstroPage({ searchParams }: Props) {
   const sp = await searchParams;
@@ -31,7 +47,19 @@ export default async function AstroPage({ searchParams }: Props) {
     );
   }
 
-  const chart = await computeChart(input.date, input.time, input.loc);
+  let chart: ChartResult;
+  try {
+    chart = await computeChart(input.date, input.time, input.loc);
+  } catch {
+    return (
+      <main className="mx-auto max-w-3xl p-4">
+        <h1 className="text-xl font-bold">ผังดวงชะตาไทย</h1>
+        <p className="mt-4 text-red-600">คำนวณไม่ได้ ตรวจสอบวันที่และเวลาอีกครั้ง (เช่น วันที่ต้องมีอยู่จริงในปฏิทิน)</p>
+        <a className="underline" href="/astro">กลับ</a>
+      </main>
+    );
+  }
+
   const customCoords = Boolean(sp.lat && sp.lon);
   const qs = new URLSearchParams({ date: input.date, time: input.time.slice(0, 5) });
   if (customCoords) {
@@ -41,11 +69,14 @@ export default async function AstroPage({ searchParams }: Props) {
     qs.set("place", sp.place);
   }
 
+  const [y, m, d] = input.date.split("-").map(Number);
+  const dateText = `วันที่ ${d} ${THAI_MONTHS[m - 1] ?? ""} พ.ศ.${y + 543}`;
+
   return (
-    <main className="mx-auto max-w-3xl p-4 pb-12">
+    <main className="mx-auto max-w-5xl p-4 pb-12">
       <h1 className="mb-3 text-xl font-bold">ผังดวงชะตาไทย</h1>
 
-      <form method="get" action="/astro" className="mb-4 flex flex-wrap items-end gap-2">
+      <form method="get" action="/astro" className="mb-2 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-0.5 text-sm text-neutral-500">
           วันที่
           <input type="date" name="date" defaultValue={input.date} required className={inputCls} />
@@ -99,46 +130,71 @@ export default async function AstroPage({ searchParams }: Props) {
           แสดงดวง
         </button>
       </form>
-
-      <p className="mb-2 text-sm text-neutral-500">
-        สถานที่: {chart.location.name} · ลัคนา{" "}
-        <span className="font-semibold text-[#0f766e] dark:text-[#5eead4]">{chart.lagna.formatted}</span>
+      <p className="mb-4 text-xs text-neutral-500">
+        เทียบกับปฏิทินโหราศาสตร์ที่แสดง &quot;สมผุส ณ เวลา 24:00น.&quot; ของวันที่ D: ให้ใส่วันถัดไป (D+1) เวลา 00:18
       </p>
 
-      <div className="rounded-xl border border-neutral-200 p-2 dark:border-neutral-800">
-        <ThaiWheel chart={chart} />
-      </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
+        <section>
+          <h2 className="text-lg font-bold">{dateText}</h2>
+          <p className="mb-2 text-sm text-neutral-500">
+            สมผุส ณ เวลา {input.time.slice(0, 5)} น. (เวลาไทย) · สถานที่ {chart.location.name}
+          </p>
 
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="border-b border-neutral-300 text-left dark:border-neutral-700">
-              <th className="px-2 py-1.5">รหัส</th>
-              <th className="px-2 py-1.5">ดาว</th>
-              <th className="px-2 py-1.5">ตำแหน่ง</th>
-              <th className="px-2 py-1.5">สถานะ</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-neutral-200 font-semibold text-[#0f766e] dark:border-neutral-800 dark:text-[#5eead4]">
-              <td className="px-2 py-1.5">ล</td>
-              <td className="px-2 py-1.5">ลัคนา</td>
-              <td className="px-2 py-1.5">{chart.lagna.formatted}</td>
-              <td className="px-2 py-1.5">—</td>
-            </tr>
-            {DISPLAY_ORDER.map((code) => {
-              const p = chart.planets[code];
-              return (
-                <tr key={code} className="border-b border-neutral-200 dark:border-neutral-800">
-                  <td className="px-2 py-1.5 font-bold">{planetSymbol(code)}</td>
-                  <td className="px-2 py-1.5">{p.name}</td>
-                  <td className="px-2 py-1.5">{p.formatted}</td>
-                  <td className="px-2 py-1.5">{p.status}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-neutral-300 text-left dark:border-neutral-700">
+                <th className="px-1.5 py-1.5">ดาว</th>
+                <th className="px-1.5 py-1.5">ราศี</th>
+                <th className="px-1.5 py-1.5 text-right">°</th>
+                <th className="px-1.5 py-1.5 text-right">′</th>
+                <th className="px-1.5 py-1.5" />
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-neutral-200 font-semibold text-[#0f766e] dark:border-neutral-800 dark:text-[#5eead4]">
+                <td className="px-1.5 py-1.5">ล. ลัคนา</td>
+                <td className="px-1.5 py-1.5 whitespace-nowrap">
+                  {pad2(THAI_ZODIACS.indexOf(chart.lagna.zodiac))} : {SIGN_ABBR[THAI_ZODIACS.indexOf(chart.lagna.zodiac)]}
+                </td>
+                <td className="px-1.5 py-1.5 text-right">{pad2(chart.lagna.degree)}</td>
+                <td className="px-1.5 py-1.5 text-right">{pad2(chart.lagna.minute)}</td>
+                <td className="px-1.5 py-1.5" />
+              </tr>
+              {DISPLAY_ORDER.map((code) => {
+                const p = chart.planets[code];
+                const zIdx = THAI_ZODIACS.indexOf(p.zodiac);
+                const retro = p.status.startsWith("พักร");
+                const slow = p.status.startsWith("มนต์");
+                return (
+                  <tr
+                    key={code}
+                    className={`border-b border-neutral-200 dark:border-neutral-800 ${code === "N" ? "border-t-2 border-t-neutral-300 dark:border-t-neutral-700" : ""}`}
+                  >
+                    <td className="px-1.5 py-1.5 whitespace-nowrap">
+                      <span className="font-bold">{planetSymbol(code)}.</span> {p.name}
+                    </td>
+                    <td className="px-1.5 py-1.5 whitespace-nowrap">
+                      {pad2(zIdx)} : {SIGN_ABBR[zIdx]}
+                    </td>
+                    <td className="px-1.5 py-1.5 text-right">{pad2(p.degree)}</td>
+                    <td className="px-1.5 py-1.5 text-right">{pad2(p.minute)}</td>
+                    <td className="px-1.5 py-1.5 font-semibold text-red-600 dark:text-[#ff8a7a]">
+                      {retro ? "พ." : slow ? <span className="text-amber-600 dark:text-amber-400">ม.</span> : ""}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          <p className="mt-2 text-xs text-neutral-500">
+            พ. = พักร (ถอยหลัง) · ม. = มนต์ (เดินช้า) · เนปจูนและพลูโตคำนวณแบบนิรายนะลาหิรี ไม่อยู่ในคัมภีร์สุริยยาตร์
+          </p>
+        </section>
+
+        <div className="rounded-xl border border-neutral-200 p-2 dark:border-neutral-800">
+          <ThaiWheel chart={chart} />
+        </div>
       </div>
 
       <p className="mt-3 text-sm text-neutral-500">
@@ -147,11 +203,11 @@ export default async function AstroPage({ searchParams }: Props) {
         </a>
       </p>
       <p className="mt-2 text-xs text-neutral-500">
-        คำนวณจากเวลามาตรฐานไทย (UTC+7) ทุกวันที่ หากเป็นดวงก่อน พ.ศ. 2463 ซึ่งไทยยังใช้เวลาท้องถิ่น
-        เวลาที่ใช้ต้องปรับเอง
+        คำนวณตามคัมภีร์สุริยยาตร์ จากเวลาไทย (UTC+7) แปลงเข้ากรอบเวลา +06:42 ของปฏิทินโหราศาสตร์ไทย
+        ลัคนาคำนวณจากอาทิตย์ขึ้นตามสถานที่ที่เลือก ยังไม่ได้ตรวจสอบกับดวงก่อน พ.ศ. 2463
       </p>
       <p className="mt-2 text-xs text-neutral-500">
-        <a className="underline" href="./"  rel="noopener noreferrer">
+        <a className="underline" href="./" rel="noopener noreferrer">
           กลับหน้าแรก
         </a>
       </p>

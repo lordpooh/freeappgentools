@@ -82,6 +82,16 @@ function splitPoint(p: RawPoint) {
   return { zodiac: THAI_ZODIACS[zIdx], degree, minute, second };
 }
 
+// ความเร็วเฉลี่ย (องศา/วัน) ใช้ตัดสินว่าดาวเดินช้า = "มนต์" (ประมาณการ: ช้ากว่า 40% ของค่าเฉลี่ย)
+const MEAN_SPEED: Record<string, number> = {
+  mars: 0.524,
+  mercury: 0.9856,
+  jupiter: 0.0831,
+  venus: 0.9856,
+  saturn: 0.0335,
+  uranus: 0.0117,
+};
+
 const fmt = (s: ReturnType<typeof splitPoint>) => `${s.zodiac} ${s.degree}° ${s.minute}′`;
 
 // ผลต่างลิปดา (b - a) ปรับให้อยู่ในช่วง (-180°, 180°]
@@ -115,7 +125,12 @@ export async function computeChart(date: string, time: string, loc: Location): P
       formatted: fmt(s),
       speed_per_day: Number(speed.toFixed(4)),
       // ปฏิทินโหราศาสตร์ไทยไม่ทำเครื่องหมายพักรให้ราหู/เกตุ
-      status: !isNode && speed < 0 ? "พักร (Retrograde)" : "ปกติ",
+      status:
+        !isNode && speed < 0
+          ? "พักร (Retrograde)"
+          : MEAN_SPEED[pl.key] && speed < MEAN_SPEED[pl.key] * 0.4
+            ? "มนต์ (เดินช้า)"
+            : "ปกติ",
     };
   }
 
