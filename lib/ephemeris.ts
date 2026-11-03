@@ -1,8 +1,10 @@
-import { readFile } from "node:fs/promises";
-import path from "node:path";
-import SwissEPH from "sweph-wasm";
-import createSwissModule from "sweph-wasm/wasm/swisseph";
+// คำนวณสมผุสดาวและลัคนาตามคัมภีร์สุริยยาตร์ (ระบบเดียวกับปฏิทินโหราศาสตร์ไทย)
+// ใช้ไลบรารี thai-astrology (MIT) เป็นแกนคำนวณ: หรคุณ -> มัชฌิม -> สมผุส -> ลัคนา
+// ไฟล์นี้ทำหน้าที่แปลงผลของไลบรารีให้เป็น ChartResult ที่หน้าเว็บใช้
+import { calculateThaiHoroscope } from "thai-astrology";
+import { computeModernPlanets } from "./modern-planets";
 import {
+  MODERN_PLANETS,
   THAI_PLANETS,
   THAI_ZODIACS,
   type ChartResult,
@@ -10,158 +12,147 @@ import {
   type PlanetInfo,
 } from "./thai-astro";
 
-const MEAN_SPEEDS: Record<number, number> = {
-  0: 0.9856, 1: 13.1764, 4: 0.524, 2: 1.3833, 5: 0.0831, 3: 1.2,
-  6: 0.0335, 11: -0.0529, 7: 0.007, 8: 0.0036, 9: 0.002,
+// เฉพาะฟิลด์ที่เราใช้จาก points ของไลบรารี (ตามคู่มือ API)
+type RawPoint = {
+  sign: number; // 0 = เมษ ... 11 = มีน
+  degrees: number;
+  minutes: number; // ดาวเป็นจำนวนเต็ม ลัคนาอาจมีทศนิยม
+  longitudeDegrees: number;
+  longitudeArcMinutes: number;
+};
+type RawChart = {
+  points: Record<string, RawPoint>;
+  calendar?: { julianDayNumber?: number; horakhun?: number };
 };
 
-function getMotionStatus(planetId: number, speed: number): string {
-  if (planetId === 11) return speed > 0 ? "เสริฐ (เดินหน้าผิดปกติ)" : "ปกติ";
-  if (planetId === 0 || planetId === 1) {
-    return speed > MEAN_SPEEDS[planetId] * 1.03 ? "เสริฐ (Fast)" : "ปกติ";
-  }
-  const mean = MEAN_SPEEDS[planetId] || 1.0;
-  if (speed < 0) return "พักร (Retrograde)";
-  if (speed === 0 || speed < mean * 0.4) return "มนต์ (Stationary)";
-  if (speed > mean * 1.2) return "เสริฐ (Fast)";
-  return "ปกติ";
+// กรอบเวลาสมผุสดาวของปฏิทินโหราศาสตร์ไทย: UTC+06:42:04 (เวลาท้องถิ่นกรุงเทพฯ)
+const CIVIL_UTC_SECONDS = 7 * 3600; // ข้อมูลที่กรอกเป็นเวลาไทย UTC+7
+const PLANETARY_FRAME_SECONDS = 6 * 3600 + 42 * 60 + 4;
+
+type Ymd = { year: number; month: number; day: number };
+
+function parseYmd(date: string): Ymd {
+  const [year, month, day] = date.split("-").map(Number);
+  return { year, month, day };
 }
 
-// ---------------------------------------------------------------------------
-// โหลด wasm: SwissEPH.init() ของ sweph-wasm ใช้ fetch(url) ซึ่งอ่านไฟล์ในเครื่องไม่ได้
-// จึงเรียก Emscripten factory ตรง ๆ แล้วส่ง instance ผ่าน instantiateWasm
-// เก็บไว้ที่ globalThis เพื่อไม่ให้ init ซ้ำเวลา hot reload ตอน dev
-// ---------------------------------------------------------------------------
-const g = globalThis as unknown as { __swePromise?: Promise<SwissEPH> };
-
-const WASM_PATH = path.join(
-  process.cwd(),
-  "node_modules",
-  "sweph-wasm",
-  "dist",
-  "wasm",
-  "swisseph.wasm"
-);
-
-function getSwe(): Promise<SwissEPH> {
-  if (!g.__swePromise) {
-    g.__swePromise = (async () => {
-      const bytes = await readFile(WASM_PATH);
-      const wasmModule = await WebAssembly.compile(bytes);
-
-      let rejectInstantiate: (e: unknown) => void = () => {};
-      const failed = new Promise<never>((_, reject) => {
-        rejectInstantiate = reject;
-      });
-
-      const wasm = await Promise.race([
-        createSwissModule({
-          instantiateWasm(
-            imports: WebAssembly.Imports,
-            onSuccess: (instance: WebAssembly.Instance, module: WebAssembly.Module) => void
-          ) {
-            WebAssembly.instantiate(wasmModule, imports)
-              .then((instance) => onSuccess(instance, wasmModule))
-              .catch(rejectInstantiate);
-            return {};
-          },
-        }),
-        failed,
-      ]);
-
-      const swe = new SwissEPH(wasm);
-      swe.swe_set_sid_mode(1, 0, 0); // Lahiri
-      return swe;
-    })().catch((err) => {
-      g.__swePromise = undefined; // ให้ลองใหม่ได้ถ้าครั้งแรกล้มเหลว
-      throw err;
-    });
-  }
-  return g.__swePromise;
+function addDays({ year, month, day }: Ymd, n: number): Ymd {
+  const t = new Date(0);
+  t.setUTCFullYear(year, month - 1, day + n);
+  return { year: t.getUTCFullYear(), month: t.getUTCMonth() + 1, day: t.getUTCDate() };
 }
 
-function splitLongitude(long: number) {
-  const zIdx = Math.floor(long / 30);
-  const degInSign = long % 30;
-  const degree = Math.floor(degInSign);
-  const minFloat = (degInSign - degree) * 60;
-  const minute = Math.floor(minFloat);
-  const second = Math.floor((minFloat - minute) * 60);
+function run(ymd: Ymd, hour: number, minute: number, loc: Location): RawChart {
+  const base = {
+    date: { year: ymd.year, era: "CE" as const, month: ymd.month, day: ymd.day },
+    time: { hour, minute },
+  };
+
+  // จังหวัดในไทย: ไลบรารีหาอาทิตย์ขึ้น (สำหรับลัคนา) และ UTC ตามวันเวลาให้เอง
+  if (loc.province) {
+    try {
+      return calculateThaiHoroscope({ ...base, location: { province: loc.province } }) as unknown as RawChart;
+    } catch {
+      // ชื่อจังหวัดที่ไลบรารีไม่รู้จัก -> ใช้พิกัดแทนด้านล่าง
+    }
+  }
+
+  // พิกัดกำหนดเอง: อาทิตย์ขึ้น ณ พิกัดนั้น + แปลงเวลาเข้ากรอบสมผุสดาว +06:42:04
+  return calculateThaiHoroscope({
+    ...base,
+    ascendantReference: {
+      method: "sunrise" as const,
+      latitude: loc.lat,
+      longitude: loc.lon,
+      utcOffsetHours: 7,
+      timePrecision: "minute" as const,
+    },
+    planetaryTimeReference: {
+      civilUtcOffsetSeconds: CIVIL_UTC_SECONDS,
+      referenceUtcOffsetSeconds: PLANETARY_FRAME_SECONDS,
+    },
+  }) as unknown as RawChart;
+}
+
+function splitPoint(p: RawPoint) {
+  const zIdx = ((p.sign % 12) + 12) % 12;
+  const degree = Math.floor(p.degrees);
+  const minute = Math.floor(p.minutes + 1e-9);
+  const second = Math.max(0, Math.min(59, Math.floor((p.minutes - minute) * 60 + 1e-9)));
   return { zodiac: THAI_ZODIACS[zIdx], degree, minute, second };
 }
 
-export async function computeChart(
-  date: string,
-  time: string,
-  loc: Location
-): Promise<ChartResult> {
-  const swe = await getSwe();
+const fmt = (s: ReturnType<typeof splitPoint>) => `${s.zodiac} ${s.degree}° ${s.minute}′`;
 
-  const [year, month, day] = date.split("-").map(Number);
-  const [hh = 0, mm = 0, ss = 0] = time.split(":").map(Number);
+// ผลต่างลิปดา (b - a) ปรับให้อยู่ในช่วง (-180°, 180°]
+function diffArcMinutes(a: number, b: number) {
+  let d = b - a;
+  if (d > 10800) d -= 21600;
+  if (d <= -10800) d += 21600;
+  return d;
+}
 
-  // เวลาไทย (UTC+7) -> UTC
-  const utc = new Date(Date.UTC(year, month - 1, day, hh - 7, mm, ss));
-  const jd = swe.swe_julday(
-    utc.getUTCFullYear(),
-    utc.getUTCMonth() + 1,
-    utc.getUTCDate(),
-    utc.getUTCHours() + utc.getUTCMinutes() / 60 + utc.getUTCSeconds() / 3600,
-    1
-  );
+export async function computeChart(date: string, time: string, loc: Location): Promise<ChartResult> {
+  const ymd = parseYmd(date);
+  const [hh = 0, mm = 0] = time.split(":").map(Number);
 
-  // MOSEPH (4) | SPEED (256) | SIDEREAL (65536) — Moshier ไม่ต้องใช้ไฟล์ .se1
-  const flags = 4 | 256 | 65536;
+  const now = run(ymd, hh, mm, loc);
+  // เวลาเดียวกันของวันถัดไป ใช้ดูทิศการเคลื่อน (พักร = ถอยหลัง)
+  const next = run(addDays(ymd, 1), hh, mm, loc);
+
   const planets: Record<string, PlanetInfo> = {};
-
-  for (const p of THAI_PLANETS) {
-    // swe_calc_ut คืน array: [lon, lat, dist, lonSpeed, latSpeed, distSpeed]
-    const res = swe.swe_calc_ut(jd, p.id, flags);
-    const long = res[0] as number;
-    const speed = res[3] as number;
-    const s = splitLongitude(long);
-    planets[p.code] = {
-      code: p.code,
-      name: p.name,
-      longitude: Number(long.toFixed(4)),
+  for (const pl of THAI_PLANETS) {
+    const p = now.points[pl.key];
+    const q = next.points[pl.key];
+    const s = splitPoint(p);
+    const speed = diffArcMinutes(p.longitudeArcMinutes, q.longitudeArcMinutes) / 60; // องศา/วัน
+    const isNode = pl.key === "rahu" || pl.key === "ketu";
+    planets[pl.code] = {
+      code: pl.code,
+      name: pl.name,
+      longitude: p.longitudeDegrees,
       ...s,
-      formatted: `${s.zodiac} ${s.degree}° ${s.minute}' ${s.second}"`,
+      formatted: fmt(s),
       speed_per_day: Number(speed.toFixed(4)),
-      status: getMotionStatus(p.id, speed),
+      // ปฏิทินโหราศาสตร์ไทยไม่ทำเครื่องหมายพักรให้ราหู/เกตุ
+      status: !isNode && speed < 0 ? "พักร (Retrograde)" : "ปกติ",
     };
   }
 
-  // เกตุ = ราหู + 180°
-  const rahu = planets["8"];
-  const ketuLong = (rahu.longitude + 180) % 360;
-  const k = splitLongitude(ketuLong);
-  planets["9"] = {
-    code: "9",
-    name: "เกตุ",
-    longitude: Number(ketuLong.toFixed(4)),
-    ...k,
-    formatted: `${k.zodiac} ${k.degree}° ${k.minute}' ${k.second}"`,
-    speed_per_day: Number((-rahu.speed_per_day).toFixed(4)),
-    status: "ปกติ",
-  };
+  // เนปจูน/พลูโต (นิรายนะ) ไม่อยู่ในสุริยยาตร์
+  const modern = await computeModernPlanets(date, time);
+  for (const m of MODERN_PLANETS) {
+    const { longitude, speed } = modern[m.code];
+    const zIdx = Math.floor(longitude / 30);
+    const inSign = longitude - zIdx * 30;
+    const degree = Math.floor(inSign);
+    const minF = (inSign - degree) * 60;
+    const minute = Math.floor(minF);
+    const second = Math.floor((minF - minute) * 60);
+    planets[m.code] = {
+      code: m.code,
+      name: m.name,
+      longitude,
+      zodiac: THAI_ZODIACS[zIdx],
+      degree,
+      minute,
+      second,
+      formatted: `${THAI_ZODIACS[zIdx]} ${degree}° ${minute}′`,
+      speed_per_day: Number(speed.toFixed(4)),
+      status: speed < 0 ? "พักร (Retrograde)" : "ปกติ",
+    };
+  }
 
-  // ลัคนา: จุดที่ราศีขึ้นที่ขอบฟ้าตะวันออก ณ สถานที่และเวลานั้น (นิรายนะ)
-  // ใช้ flag SIDEREAL กับ whole-sign ('W') แล้วอ่านค่า ascmc[0]
-  const houses = swe.swe_houses_ex(jd, 65536, loc.lat, loc.lon, "W");
-  const ascLong = (((houses.ascmc[0] as number) % 360) + 360) % 360;
-  const l = splitLongitude(ascLong);
+  const asc = now.points.ascendant;
+  const l = splitPoint(asc);
 
   return {
     datetime_th: `${date} ${time}`,
-    julian_day: jd,
-    system: "Sidereal (Lahiri Ayanamsa)",
-    ayanamsa: swe.swe_get_ayanamsa_ut(jd),
+    julian_day: now.calendar?.julianDayNumber ?? null,
+    horakhun: now.calendar?.horakhun ?? null,
+    system: "สุริยยาตร์ (ปฏิทินโหราศาสตร์ไทย) + เนปจูน/พลูโตนิรายนะ",
     location: loc,
-    lagna: {
-      longitude: Number(ascLong.toFixed(4)),
-      ...l,
-      formatted: `${l.zodiac} ${l.degree}° ${l.minute}' ${l.second}"`,
-    },
+    lagna: { longitude: asc.longitudeDegrees, ...l, formatted: fmt(l) },
     planets,
   };
 }
