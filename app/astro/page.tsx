@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 };
 
 type Props = {
-  searchParams: Promise<{ date?: string; time?: string; place?: string; lat?: string; lon?: string }>;
+  searchParams: Promise<{ date?: string; time?: string; place?: string; lat?: string; lon?: string; cal?: string }>;
 };
 
 const inputCls =
@@ -69,7 +69,7 @@ export default async function AstroPage({ searchParams }: Props) {
     qs.set("place", sp.place);
   }
 
-  const [y, m, d] = input.date.split("-").map(Number);
+  const [y, m, d] = (input.calendarDate ?? input.date).split("-").map(Number);
   const dateText = `วันที่ ${d} ${THAI_MONTHS[m - 1] ?? ""} พ.ศ.${y + 543}`;
 
   return (
@@ -79,7 +79,7 @@ export default async function AstroPage({ searchParams }: Props) {
       <form method="get" action="/astro" className="mb-2 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-0.5 text-sm text-neutral-500">
           วันที่
-          <input type="date" name="date" defaultValue={input.date} required className={inputCls} />
+          <input type="date" name="date" defaultValue={input.calendarDate ?? input.date} required className={inputCls} />
         </label>
         <label className="flex flex-col gap-0.5 text-sm text-neutral-500">
           เวลา (เวลาไทย)
@@ -126,6 +126,10 @@ export default async function AstroPage({ searchParams }: Props) {
             </label>
           </div>
         </details>
+        <label className="flex items-center gap-1.5 py-2 text-sm text-neutral-500">
+          <input type="checkbox" name="cal" value="1" defaultChecked={Boolean(input.calendarDate)} />
+          ตามปฏิทิน (24:00 น.)
+        </label>
         <button type="submit" className="rounded-lg bg-[#8a6d3b] px-4 py-2 text-white hover:bg-[#75592c]">
           แสดงดวง
         </button>
@@ -134,14 +138,17 @@ export default async function AstroPage({ searchParams }: Props) {
         </a>
       </form>
       <p className="mb-4 text-xs text-neutral-500">
-        เทียบกับปฏิทินโหราศาสตร์ที่แสดง &quot;สมผุส ณ เวลา 24:00น.&quot; ของวันที่ D: ให้ใส่วันถัดไป (D+1) เวลา 00:18
+        ติ๊ก &quot;ตามปฏิทิน&quot; เพื่อให้ตรงกับหน้าปฏิทินโหราศาสตร์ที่แสดงสมผุส ณ เวลา 24:00น. ของวันที่เลือก (ไม่ใช้ช่องเวลา)
       </p>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
         <section>
           <h2 className="text-lg font-bold">{dateText}</h2>
           <p className="mb-2 text-sm text-neutral-500">
-            สมผุส ณ เวลา {input.time.slice(0, 5)} น. (เวลาไทย) · สถานที่ {chart.location.name}
+            {input.calendarDate
+              ? "สมผุส ณ เวลา 24:00น. (ตามปฏิทิน)"
+              : `สมผุส ณ เวลา ${input.time.slice(0, 5)} น. (เวลาไทย)`}{" "}
+            · สถานที่ {chart.location.name}
           </p>
 
           <table className="w-full border-collapse text-sm">
