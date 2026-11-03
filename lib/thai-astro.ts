@@ -113,15 +113,31 @@ type RawInput = {
   place?: string | null;
   lat?: string | null;
   lon?: string | null;
+  /** "1" = โหมดตามปฏิทิน: ใช้สมผุส ณ 24:00น. ของวันที่เลือก (เหมือนหน้าปฏิทินโหราศาสตร์) */
+  cal?: string | null;
 };
+
+function addOneDay(date: string): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const t = new Date(0);
+  t.setUTCFullYear(y, m - 1, d + 1);
+  return `${String(t.getUTCFullYear()).padStart(4, "0")}-${String(t.getUTCMonth() + 1).padStart(2, "0")}-${String(t.getUTCDate()).padStart(2, "0")}`;
+}
 
 /** ตรวจ date=YYYY-MM-DD, time=HH:MM[:SS], place=<key> หรือ lat/lon (กรอกคู่กัน) */
 export function parseInput(p: RawInput) {
   // ค่าเริ่มต้น = วันและเวลาปัจจุบันตามเวลาไทย (UTC+7)
   const nowTh = new Date(Date.now() + 7 * 3600_000).toISOString();
-  const date = p.date || nowTh.slice(0, 10);
-  const t = p.time || nowTh.slice(11, 16);
+  let date = p.date || nowTh.slice(0, 10);
+  let t = p.time || nowTh.slice(11, 16);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}(:\d{2})?$/.test(t)) return null;
+
+  // โหมดตามปฏิทิน: สมผุส ณ 24:00น. ของวัน D ในกรอบเวลา +06:42:04 = 00:18 (เวลาไทย UTC+7) ของวัน D+1
+  const calendarDate = p.cal === "1" ? date : null;
+  if (calendarDate) {
+    date = addOneDay(date);
+    t = "00:18";
+  }
 
   let loc: Location = PLACES[0];
   const preset = PLACES.find((x) => x.key === p.place);
@@ -138,5 +154,5 @@ export function parseInput(p: RawInput) {
     loc = { name: `พิกัด ${lat.toFixed(4)}, ${lon.toFixed(4)}`, lat, lon };
   }
 
-  return { date, time: t.length === 5 ? `${t}:00` : t, loc };
+  return { date, time: t.length === 5 ? `${t}:00` : t, loc, calendarDate };
 }
