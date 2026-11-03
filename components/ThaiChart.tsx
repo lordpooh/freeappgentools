@@ -138,7 +138,7 @@ export default function ThaiChart({ chart }: { chart: ChartResult }) {
           fontSize={12.5}
           className="fill-[#8a7a58] dark:fill-[#a39a86]"
         >
-          นิรายนะ · ลาหิรี {fmtAyanamsa((chartResult as any).ayanamsa)}
+          นิรายนะ · ลาหิรี {fmtAyanamsa((chart as any)?.ayanamsa ?? 0)}
         </text>
         <text
           x={mid}
