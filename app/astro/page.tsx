@@ -74,7 +74,12 @@ export default async function AstroPage({ searchParams }: Props) {
 
   return (
     <main className="mx-auto max-w-5xl p-4 pb-12">
-      <h1 className="mb-3 text-xl font-bold">ผังดวงชะตาไทย</h1>
+      <h1 className="mb-1 text-xl font-bold">ผังดวงชะตาไทย</h1>
+      <p className="mb-3 text-sm">
+        <a className="underline" href="/astro/predict">
+          คำทำนายจากวันเกิด →
+        </a>
+      </p>
 
       <form method="get" action="/astro" className="mb-2 flex flex-wrap items-end gap-2">
         <label className="flex flex-col gap-0.5 text-sm text-neutral-500">
