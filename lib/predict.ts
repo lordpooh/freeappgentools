@@ -7,7 +7,7 @@ import { THAI_ZODIACS, isRetrograde, type ChartResult } from "./thai-astro";
 export type Tone = "ดี" | "ร้าย" | "ผสม" | "กลาง";
 export type Item = { head?: string; text: string; tone?: Tone; sub?: string[] };
 export type Section = { id: string; title: string; note?: string; items: Item[] };
-export type Reading = { hasTime: boolean; summary: string[]; sections: Section[] };
+export type Reading = { hasTime: boolean; summary: Item[]; sections: Section[] };
 export type Gender = "m" | "f" | undefined;
 
 // ---------------------------------------------------------------------------
@@ -231,7 +231,12 @@ export function buildReading(natal: ChartResult, now: ChartResult, hasTime: bool
   const lagnaLords = hasTime ? lordsOfHouse(1) : [];
 
   const sections: Section[] = [];
-  const summary: string[] = [];
+  const strong: string[] = []; // ดาวมีกำลัง (เกษตร/อุจจ์)
+  const weak: string[] = []; // ดาวเสีย (ประ/นิจ)
+  let dasaHead = "";
+  let dasaRel = "";
+  let dasaTone: Tone = "กลาง";
+  const hits: { planet: string; target: string; label: string; tone: Tone; text: string }[] = [];
 
   // ---------- ๑. ลัคนาและดาวเจ้าเรือนลัคน์ ----------
   if (hasTime) {
@@ -272,6 +277,8 @@ export function buildReading(natal: ChartResult, now: ChartResult, hasTime: bool
     const dg = dignity(c, s);
     const h = hOf(s);
     const retro = isRetrograde(natal.planets[c]);
+    if (dg === "เกษตร" || dg === "อุจจ์") strong.push(`${nameOf(c)} (${dg})`);
+    if (dg === "ประ" || dg === "นิจ") weak.push(`${nameOf(c)} (${dg})`);
     const sub: string[] = [];
     sub.push(`ความหมายของดาว: ${PLANET_INFO[c].signifies}`);
     if (hasTime) {
@@ -377,6 +384,9 @@ export function buildReading(natal: ChartResult, now: ChartResult, hasTime: bool
     else if (natureOf(ruler) === "ศุภ" && natureOf(sub) === "ศุภ") { tone = "ดี"; rel = "ทั้งคู่เป็นศุภเคราะห์ ให้คุณ"; }
     else if (natureOf(ruler) === "บาป" && natureOf(sub) === "บาป") { tone = "ร้าย"; rel = "ทั้งคู่เป็นบาปเคราะห์ ต้องอดทนและระมัดระวัง"; }
     else { tone = "ผสม"; rel = "ศุภเคราะห์กับบาปเคราะห์ ผลปนกัน"; }
+    dasaHead = `${desc(ruler)} · เสวยแทรก ${desc(sub)}`;
+    dasaRel = rel;
+    dasaTone = tone;
     sections.push({
       id: "dasa",
       title: "ดาวเสวยอายุ-เสวยแทรก (ระบบพลูหลวง)",
@@ -448,6 +458,7 @@ export function buildReading(natal: ChartResult, now: ChartResult, hasTime: bool
       for (const t of targets) {
         const ang = angleOf(s, t.sign);
         const j = judge(nat, t.nature, ang);
+        hits.push({ planet: c, target: t.key, label: `${nameOf(c)}จร ${ANGLE_LABEL[ang]} ${t.label}`, tone: j.tone, text: j.text });
         sub.push(`[${j.tone}] ${nameOf(c)}จร ${ANGLE_LABEL[ang]} ${t.label}: ${j.text}`);
       }
     }
@@ -487,25 +498,114 @@ export function buildReading(natal: ChartResult, now: ChartResult, hasTime: bool
     ],
   });
 
-  // ---------- สรุป ----------
-  if (hasTime) {
-    const lc = lagnaLords.find((x) => x !== "B");
-    if (lc) {
-      const s = signIdx(natal, lc);
-      const dg = dignity(lc, s);
-      summary.push(`ลัคนา${signName(lagna)}: ดาวเจ้าเรือนลัคน์คือ${nameOf(lc)} อยู่ภพ${HOUSES[hOf(s) - 1].name}${dg ? ` (${dg})` : ""}`);
-    } else summary.push(`ลัคนา${signName(lagna)}`);
-    summary.push(`ปีนี้ลัคนาจรเข้าภพ${HOUSES[jonHouse - 1].name}: เน้นเรื่อง${HOUSES[jonHouse - 1].theme}`);
-  } else {
-    summary.push("ไม่ทราบเวลาเกิด จึงไม่ใช้ลัคนาและภพ ผลด้านล่างเป็นภาพกว้างจากราศีและศักดิ์ของดาวเท่านั้น");
+  // ---------- สรุปผลทำนาย (ระบบพลูหลวง) ----------
+  const summary: Item[] = [];
+  const keyTargets = hasTime ? ["lagna", "lord"] : ["1", "2"]; // จุดที่ใช้นับคะแนนมุมดาวจร
+  const keyHits = hits.filter((h) => keyTargets.includes(h.target));
+  const goodHits = keyHits.filter((h) => h.tone === "ดี");
+  const badHits = keyHits.filter((h) => h.tone === "ร้าย");
+  const jonDust = hasTime && jonHouse > 0 && HOUSES[jonHouse - 1].dusthana;
+  const score = goodHits.length - badHits.length + (dasaTone === "ดี" ? 1 : dasaTone === "ร้าย" ? -1 : 0) - (jonDust ? 1 : 0);
+  const overall: { tone: Tone; text: string } =
+    score >= 2
+      ? { tone: "ดี", text: "ช่วงนี้ค่อนข้างราบรื่น มีแรงหนุนมากกว่าแรงกดดัน" }
+      : score <= -2
+        ? { tone: "ร้าย", text: "ช่วงนี้มีแรงกดดันมากกว่าแรงหนุน ควรระมัดระวังและไม่ใจร้อน" }
+        : { tone: "ผสม", text: "ช่วงนี้ผสมผสาน มีทั้งโอกาสและอุปสรรคพอ ๆ กัน" };
+
+  // ๑ ภาพรวมช่วงนี้
+  summary.push({
+    head: "ภาพรวมช่วงนี้",
+    text: overall.text,
+    tone: overall.tone,
+    sub: [
+      `นับจากมุมของดาวจรช้ากับ${hasTime ? "ลัคนาและดาวเจ้าเรือนลัคน์" : "อาทิตย์และจันทร์กำเนิด"}: ให้คุณ ${goodHits.length} จุด · ให้โทษ ${badHits.length} จุด`,
+      ...(dasaHead ? [`ดาวเสวยอายุ-เสวยแทรก: ${dasaRel}`] : []),
+      ...(jonDust ? [`ลัคนาจรปีนี้เข้าภพทุสถานะ (${HOUSES[jonHouse - 1].name}) จึงลดคะแนนลง`] : []),
+      "เป็นการนับแบบหยาบเพื่อให้เห็นแนวโน้ม ไม่ใช่คะแนนที่ตำราให้ไว้",
+    ],
+  });
+
+  // ๒ ดวงกำเนิด
+  {
+    const sub: string[] = [];
+    let head = "ดวงกำเนิด";
+    let tone: Tone = "กลาง";
+    if (hasTime) {
+      const lc = lagnaLords.find((x) => x !== "B");
+      const el = LOCAL_ELEMENT[lagna % 4];
+      head = `ดวงกำเนิด: ลัคนา${signName(lagna)} (ธาตุ${el})`;
+      if (lc) {
+        const ls = signIdx(natal, lc);
+        const ldg = dignity(lc, ls);
+        const lh = hOf(ls);
+        sub.push(`ดาวเจ้าเรือนลัคน์คือ${nameOf(lc)} อยู่ราศี${signName(ls)} ภพ${HOUSES[lh - 1].name}${ldg ? ` (${ldg})` : ""} — ${HOUSES[lh - 1].dusthana ? "ตกภพทุสถานะ ให้โทษแก่ดาวเจ้าเรือนลัคน์" : `ชีวิตผูกพันกับเรื่อง${houseTheme(lh, gender)}`}`);
+        tone = HOUSES[lh - 1].dusthana || ldg === "ประ" || ldg === "นิจ" ? "ร้าย" : ldg === "เกษตร" || ldg === "อุจจ์" ? "ดี" : "กลาง";
+      }
+      const lagnaFinds = angleItems.filter((i) => i.head && !i.head.startsWith("ดาวกุมกัน"));
+      const goodF = lagnaFinds.filter((i) => i.tone === "ดี").map((i) => i.head);
+      const badF = lagnaFinds.filter((i) => i.tone === "ร้าย").map((i) => i.head);
+      sub.push(`จุดเด่น: ${goodF.length ? goodF.join(" · ") : "ไม่มีมุมให้คุณชัดเจนกับลัคนา"}`);
+      sub.push(`จุดที่ต้องระวัง: ${badF.length ? badF.join(" · ") : "ไม่มีมุมให้โทษชัดเจนกับลัคนา"}`);
+    } else {
+      sub.push("ไม่ทราบเวลาเกิด จึงสรุปจากราศีและศักดิ์ของดาวเท่านั้น");
+    }
+    sub.push(`ดาวมีกำลัง (เกษตร/อุจจ์): ${strong.length ? strong.join(" · ") : "ไม่มี"}`);
+    sub.push(`ดาวเสีย (ประ/นิจ): ${weak.length ? weak.join(" · ") : "ไม่มี"}`);
+    summary.push({ head, text: "สรุปจากลัคนา ดาวเจ้าเรือนลัคน์ มุมกับลัคนา และศักดิ์ของดาวทั้งหมด", tone, sub });
   }
-  const dasa = sections.find((x) => x.id === "dasa");
-  if (dasa) summary.push(`${dasa.items[0].head} · ${dasa.items[1].head} → ${dasa.items[2].text}`);
-  const tr = sections.find((x) => x.id === "transit");
-  if (tr) {
-    const bad = tr.items.flatMap((i) => i.sub ?? []).filter((t) => t.startsWith("[ร้าย]") && (t.includes("ลัคนา") || t.includes("เจ้าเรือนลัคน์"))).length;
-    const good = tr.items.flatMap((i) => i.sub ?? []).filter((t) => t.startsWith("[ดี]") && (t.includes("ลัคนา") || t.includes("เจ้าเรือนลัคน์"))).length;
-    if (hasTime) summary.push(`ดาวจรช้าที่ทำมุมกับลัคนา/ดาวเจ้าเรือนลัคน์ในตอนนี้: มุมให้คุณ ${good} จุด · มุมให้โทษ ${bad} จุด`);
+
+  // ๓ ปีนี้ (เกณฑ์อายุ)
+  if (dasaHead || jonHouse) {
+    const sub: string[] = [];
+    if (dasaHead) sub.push(`เสวยอายุ: ${dasaHead}`);
+    if (dasaRel) sub.push(dasaRel);
+    if (jonHouse) sub.push(`ลัคนาจรเข้าภพ${HOUSES[jonHouse - 1].name}: เน้นเรื่อง${houseTheme(jonHouse, gender)}`);
+    summary.push({
+      head: `ปีนี้ (อายุเต็ม ${age} ปี)`,
+      text: jonHouse ? `คำทำนายของปีเน้นเรื่อง${HOUSES[jonHouse - 1].theme}` : "ดูจากดาวเสวยอายุ-เสวยแทรก",
+      tone: jonDust ? "ร้าย" : dasaTone,
+      sub,
+    });
+  }
+
+  // ๔ แรงหนุน/แรงกดดันจากดาวจร
+  {
+    const sub: string[] = [];
+    const jp = now.planets["5"];
+    const sa = now.planets["7"];
+    const jS = signIdx(now, "5");
+    const sS = signIdx(now, "7");
+    sub.push(
+      hasTime
+        ? `แรงหนุน: พฤหัสบดีจรภพ${HOUSES[houseOf(jS, lagna) - 1].name} → เรื่อง${houseTheme(houseOf(jS, lagna), gender)}${isRetrograde(jp) ? " (พักร ผลช้า)" : ""}`
+        : `พฤหัสบดีจรราศี${signName(jS)}${isRetrograde(jp) ? " (พักร)" : ""}`
+    );
+    sub.push(
+      hasTime
+        ? `แรงกดดัน: เสาร์จรภพ${HOUSES[houseOf(sS, lagna) - 1].name} → เรื่อง${houseTheme(houseOf(sS, lagna), gender)}${isRetrograde(sa) ? " (พักร ผลช้า)" : ""}`
+        : `เสาร์จรราศี${signName(sS)}${isRetrograde(sa) ? " (พักร)" : ""}`
+    );
+    if (goodHits.length) sub.push(`มุมให้คุณ: ${goodHits.map((h) => h.label).join(" · ")}`);
+    if (badHits.length) sub.push(`มุมให้โทษ: ${badHits.map((h) => h.label).join(" · ")}`);
+    summary.push({
+      head: "ดาวจรที่กระทบดวงกำเนิดตอนนี้",
+      text: `ดาวจร ณ ${nDate} ${nTime.slice(0, 5)} น. เทียบกับดวงกำเนิด`,
+      tone: goodHits.length > badHits.length ? "ดี" : badHits.length > goodHits.length ? "ร้าย" : "ผสม",
+      sub,
+    });
+  }
+
+  // ๕ ข้อแนะนำ
+  {
+    const sub: string[] = [];
+    if (overall.tone === "ร้าย") sub.push("ช่วงมีแรงกดดัน: เลี่ยงการตัดสินใจใหญ่แบบเสี่ยง ไม่ก่อศัตรู รักษาสุขภาพ และใช้ความอดทน");
+    else if (overall.tone === "ดี") sub.push("ช่วงมีแรงหนุน: เหมาะกับการเริ่มเรื่องสำคัญที่เตรียมไว้แล้ว แต่ไม่ควรประมาท");
+    else sub.push("ช่วงผสมผสาน: ทำงานตามแผน ตัดสินใจเรื่องใหญ่ด้วยความรอบคอบ");
+    if (jonDust) sub.push(`ลัคนาจรเข้าภพ${HOUSES[jonHouse - 1].name} (ทุสถานะ): ระวังเรื่อง${HOUSES[jonHouse - 1].theme}`);
+    if (hasTime && badHits.some((h) => h.planet === "N")) sub.push("เนปจูนเป็นประธานฝ่ายบาปเคราะห์ในระบบพลูหลวง เมื่อให้โทษมักรุนแรง ควรระวังเรื่องการถูกหลอกลวงและเรื่องเร้นลับ");
+    sub.push(`วันนี้ (ตำราทั่วไป): เป็นวัน${THAKSA[todayPos].pos}ของคุณ — ${THAKSA[todayPos].advice}`);
+    summary.push({ head: "ข้อแนะนำ", text: "แนวทางตามแนวโน้มข้างต้น ใช้ประกอบการตัดสินใจ", tone: "กลาง", sub });
   }
 
   return { hasTime, summary, sections };

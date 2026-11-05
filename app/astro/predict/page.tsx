@@ -107,9 +107,9 @@ export default async function PredictPage({ searchParams }: Props) {
         ระบบโหราศาสตร์พลูหลวง (เกษตรเรือนเดี่ยว) เทียบดวงกำเนิดกับดาวจร ณ ปัจจุบัน ·{" "}
         <a className="underline" href="/astro">
           กลับหน้าผังดวง
-        </a>       
+        </a>
       </p>
-    <p className="mb-3 text-sm">
+      <p className="mb-3 text-sm">
         <a className="underline" href="/">
           กลับหน้าแรก →
         </a>
@@ -167,10 +167,10 @@ export default async function PredictPage({ searchParams }: Props) {
           </p>
 
           <section className={card}>
-            <h2 className="mb-2 text-lg font-bold">สรุปภาพรวม</h2>
-            <ul className="list-disc space-y-1 pl-5 text-sm">
-              {reading.summary.map((s) => (
-                <li key={s}>{s}</li>
+            <h2 className="mb-2 text-lg font-bold">สรุปผลทำนาย</h2>
+            <ul className="space-y-2">
+              {reading.summary.map((it, i) => (
+                <ItemView key={`sum-${i}`} item={it} />
               ))}
             </ul>
           </section>
