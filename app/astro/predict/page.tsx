@@ -1,22 +1,21 @@
 import type { Metadata } from "next";
 import ThaiWheel from "../../../components/ThaiWheel";
 import { computeChart } from "../../../lib/ephemeris";
-import { buildReading, type Reading } from "../../../lib/predict";
+import { buildReading, type Gender, type Item, type Reading, type Tone } from "../../../lib/predict";
 import { PLACES, parseInput, type ChartResult } from "../../../lib/thai-astro";
 
 export const metadata: Metadata = {
-  title: "คำทำนายจากวันเกิด",
-  description: "ดวงกำเนิดตามคัมภีร์สุริยยาตร์ เทียบกับดาวจรปัจจุบัน ทักษา และฤกษ์เกิด",
+  title: "คำทำนายจากวันเกิด (ระบบพลูหลวง)",
+  description: "ดวงกำเนิดตามคัมภีร์สุริยยาตร์ เทียบกับดาวจรปัจจุบัน แปลผลตามระบบโหราศาสตร์พลูหลวง",
 };
 
 type Props = {
-  searchParams: Promise<{ date?: string; time?: string; nt?: string; place?: string }>;
+  searchParams: Promise<{ date?: string; time?: string; nt?: string; place?: string; sex?: string }>;
 };
 
 const inputCls =
   "rounded-lg border border-neutral-300 bg-transparent px-3 py-2 text-base text-inherit dark:border-neutral-700";
 const card = "rounded-xl border border-neutral-200 p-4 dark:border-neutral-800";
-const h2 = "mb-2 text-lg font-bold";
 
 const THAI_MONTHS = [
   "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
@@ -27,9 +26,58 @@ function thaiDate(date: string) {
   return `${d} ${THAI_MONTHS[m - 1] ?? ""} พ.ศ.${y + 543}`;
 }
 
+const TONE_CLS: Record<Tone, string> = {
+  ดี: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300",
+  ร้าย: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
+  ผสม: "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
+  กลาง: "",
+};
+
+function ToneBadge({ tone }: { tone?: Tone }) {
+  if (!tone || tone === "กลาง") return null;
+  return <span className={`ml-2 rounded px-1.5 py-0.5 text-xs font-semibold ${TONE_CLS[tone]}`}>{tone}</span>;
+}
+
+// บรรทัดย่อยที่ขึ้นต้นด้วย [ดี]/[ร้าย]/[ผสม] แสดงเป็นป้ายสี
+function SubLine({ text }: { text: string }) {
+  const m = text.match(/^\[(ดี|ร้าย|ผสม)\]\s*(.*)$/);
+  if (!m) return <li>{text}</li>;
+  return (
+    <li>
+      <ToneBadge tone={m[1] as Tone} />
+      {m[2]}
+    </li>
+  );
+}
+
+function ItemView({ item }: { item: Item }) {
+  return (
+    <li className="border-b border-neutral-200 pb-2 last:border-0 dark:border-neutral-800">
+      {item.head && (
+        <div className="font-semibold">
+          {item.head}
+          <ToneBadge tone={item.tone} />
+        </div>
+      )}
+      <div className="text-sm">{item.text}</div>
+      {item.sub && item.sub.length > 0 && (
+        <details className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
+          <summary className="cursor-pointer text-xs text-neutral-500">รายละเอียด ({item.sub.length})</summary>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {item.sub.map((t) => (
+              <SubLine key={t} text={t} />
+            ))}
+          </ul>
+        </details>
+      )}
+    </li>
+  );
+}
+
 export default async function PredictPage({ searchParams }: Props) {
   const sp = await searchParams;
   const hasTime = sp.nt !== "1";
+  const gender: Gender = sp.sex === "m" ? "m" : sp.sex === "f" ? "f" : undefined;
 
   let natal: ChartResult | null = null;
   let now: ChartResult | null = null;
@@ -45,7 +93,7 @@ export default async function PredictPage({ searchParams }: Props) {
       try {
         natal = await computeChart(birth.date, birth.time, birth.loc);
         now = await computeChart(today.date, today.time, birth.loc);
-        reading = buildReading(natal, now, hasTime);
+        reading = buildReading(natal, now, hasTime, gender);
       } catch {
         error = "คำนวณไม่ได้ ตรวจสอบวันที่และเวลาเกิดอีกครั้ง";
       }
@@ -56,9 +104,14 @@ export default async function PredictPage({ searchParams }: Props) {
     <main className="mx-auto max-w-3xl p-4 pb-12">
       <h1 className="mb-1 text-xl font-bold">คำทำนายจากวันเกิด</h1>
       <p className="mb-3 text-sm text-neutral-500">
-        เทียบดวงกำเนิดกับดาวจร ณ ปัจจุบัน ตามคัมภีร์สุริยยาตร์ ·{" "}
+        ระบบโหราศาสตร์พลูหลวง (เกษตรเรือนเดี่ยว) เทียบดวงกำเนิดกับดาวจร ณ ปัจจุบัน ·{" "}
         <a className="underline" href="/astro">
           กลับหน้าผังดวง
+        </a>       
+      </p>
+    <p className="mb-3 text-sm">
+        <a className="underline" href="/">
+          กลับหน้าแรก →
         </a>
       </p>
 
@@ -81,6 +134,20 @@ export default async function PredictPage({ searchParams }: Props) {
             ))}
           </select>
         </label>
+        <label className="flex flex-col gap-0.5 text-sm text-neutral-500">
+          เพศ (ใช้ตีความภพ ๔ และ ๙)
+          <select name="sex" defaultValue={sp.sex || ""} className={inputCls}>
+            <option value="" className="text-black">
+              ไม่ระบุ
+            </option>
+            <option value="m" className="text-black">
+              ชาย
+            </option>
+            <option value="f" className="text-black">
+              หญิง
+            </option>
+          </select>
+        </label>
         <label className="flex items-center gap-1.5 py-2 text-sm text-neutral-500">
           <input type="checkbox" name="nt" value="1" defaultChecked={!hasTime} />
           ไม่ทราบเวลาเกิด
@@ -95,13 +162,12 @@ export default async function PredictPage({ searchParams }: Props) {
       {natal && now && reading && (
         <div className="flex flex-col gap-4">
           <p className="text-sm text-neutral-500">
-            เกิดวัน{reading.birth.weekday}
-            {reading.birth.night ? " (กลางคืน)" : ""} ที่ {thaiDate(natal.datetime_th.split(" ")[0])}
+            เกิดวันที่ {thaiDate(natal.datetime_th.split(" ")[0])}
             {hasTime ? ` เวลา ${natal.datetime_th.split(" ")[1].slice(0, 5)} น.` : " (ไม่ทราบเวลา)"} · {natal.location.name}
           </p>
 
           <section className={card}>
-            <h2 className={h2}>สรุปภาพรวม</h2>
+            <h2 className="mb-2 text-lg font-bold">สรุปภาพรวม</h2>
             <ul className="list-disc space-y-1 pl-5 text-sm">
               {reading.summary.map((s) => (
                 <li key={s}>{s}</li>
@@ -115,88 +181,22 @@ export default async function PredictPage({ searchParams }: Props) {
             </div>
           )}
 
-          <section className={card}>
-            <h2 className={h2}>ดวงกำเนิด</h2>
-            {reading.birth.lagnaSign && (
-              <p className="mb-2 text-sm">
-                <b>ลัคนา{reading.birth.lagnaSign}</b> — {reading.birth.lagnaTrait}
-              </p>
-            )}
-            <p className="mb-3 text-sm">
-              <b>ฤกษ์เกิด</b> (ตามจันทร์): ฤกษ์ที่ {reading.birth.ruekNo} {reading.birth.ruekName}
-            </p>
-            <h3 className="mb-1 font-semibold">ทักษาตามวันเกิด (เกิดวัน{reading.birth.planetName})</h3>
-            <div className="mb-3 overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
-                <tbody>
-                  {reading.thaksa.map((t) => (
-                    <tr key={t.pos} className="border-b border-neutral-200 dark:border-neutral-800">
-                      <td className="px-2 py-1 font-semibold">{t.pos}</td>
-                      <td className="px-2 py-1">{t.planetName}</td>
-                      <td className="px-2 py-1 text-neutral-500">{t.meaning}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <h3 className="mb-1 font-semibold">ดาวในดวงกำเนิด</h3>
-            <ul className="space-y-1.5 text-sm">
-              {reading.natal.map((n) => (
-                <li key={n.code}>
-                  <span className="font-semibold">{n.name}</span> · {n.sign}
-                  {n.houseText ? ` · ${n.houseText}` : ""}
-                  {n.dignity ? ` · ${n.dignity}` : ""}
-                  <div className="text-neutral-500">{n.text}</div>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className={card}>
-            <h2 className={h2}>ดวงปัจจุบัน เทียบกับดวงกำเนิด</h2>
-            <p className="mb-3 text-xs text-neutral-500">
-              ดาวจร ณ {thaiDate(now.datetime_th.split(" ")[0])} เวลา {now.datetime_th.split(" ")[1].slice(0, 5)} น.
-            </p>
-
-            <h3 className="mb-1 font-semibold">วันนี้ (วัน{reading.today.weekday})</h3>
-            <ul className="mb-3 list-disc space-y-1 pl-5 text-sm">
-              <li>
-                ทักษา: วัน{reading.today.thaksaPos}ของคุณ — {reading.today.thaksaAdvice}
-              </li>
-              <li>
-                ฤกษ์: จันทร์จรฤกษ์ที่ {reading.today.ruekNo} {reading.today.ruekName} นับจากฤกษ์เกิดเป็นตารา
-                {reading.today.taraName} ({reading.today.taraTone}) — {reading.today.taraText}
-              </li>
-            </ul>
-
-            <h3 className="mb-1 font-semibold">ดาวจรช้า (ผลระยะยาว)</h3>
-            <ul className="mb-3 space-y-2 text-sm">
-              {reading.transits.map((t) => (
-                <li key={t.code}>
-                  {t.text}
-                  {t.relations.length > 0 && (
-                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-neutral-500">
-                      {t.relations.map((r) => (
-                        <li key={r}>{r}</li>
-                      ))}
-                    </ul>
-                  )}
-                </li>
-              ))}
-            </ul>
-
-            <h3 className="mb-1 font-semibold">ดาวจรเร็ว (ผลระยะสั้น ไม่กี่สัปดาห์)</h3>
-            <ul className="space-y-1.5 text-sm">
-              {reading.shortTerm.map((t) => (
-                <li key={t.code}>{t.text}</li>
-              ))}
-            </ul>
-          </section>
+          {reading.sections.map((sec) => (
+            <section key={sec.id} className={card}>
+              <h2 className="text-lg font-bold">{sec.title}</h2>
+              {sec.note && <p className="mb-2 text-xs text-neutral-500">{sec.note}</p>}
+              <ul className="mt-2 space-y-2">
+                {sec.items.map((it, i) => (
+                  <ItemView key={`${sec.id}-${i}`} item={it} />
+                ))}
+              </ul>
+            </section>
+          ))}
 
           <p className="text-xs text-neutral-500">
-            คำทำนายนี้เป็นการแปลผลตามกฎโหราศาสตร์แบบกว้าง ๆ ใช้ประกอบการพิจารณาเท่านั้น ไม่ใช่การยืนยันเหตุการณ์
-            และไม่ควรใช้ตัดสินใจเรื่องสุขภาพ กฎหมาย หรือการเงิน · มฤตยู เนปจูน พลูโต แสดงในผังแต่ไม่นำมาแปลผล ·
-            เกิดวันพุธตั้งแต่ 18:00 น. นับเป็นพุธกลางคืน (ราหู)
+            แปลผลตามกฎโหราศาสตร์ระบบพลูหลวงแบบกว้าง ๆ ใช้ประกอบการพิจารณาเท่านั้น ไม่ใช่การยืนยันเหตุการณ์
+            และไม่ควรใช้ตัดสินใจเรื่องสุขภาพ กฎหมาย หรือการเงิน · ผลจริงต้องพิจารณาดาวและมุมทั้งหมดร่วมกัน ·
+            แบคคัสยังไม่ได้คำนวณ · ดวงปัจจุบันคำนวณจากเวลาไทย ณ ตอนเปิดหน้านี้
           </p>
         </div>
       )}

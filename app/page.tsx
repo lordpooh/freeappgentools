@@ -5,20 +5,17 @@ import QRCode from "qrcode";
 import Link from "next/link";
 
 export default function Home() {
-  // 1. แก้ไข Type ให้รองรับ "astro"
-  const [tab, setTab] = useState<"link" | "donate" | "astro">("link");
+  // 1. เพิ่ม "tarot" ใน Type definition
+  const [tab, setTab] = useState<"link" | "donate" | "astro" | "tarot" | "PDF">("link");
   const [text, setText] = useState("https://example.com");
   const [qrUrl, setQrUrl] = useState("");
 
-  // เบอร์พร้อมเพย์กรุงไทยสำหรับรับบริจาค
   const myPromptPayId = "0888501044"; 
 
-  // ฟอร์ม Feedback
   const [feedback, setFeedback] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // สร้าง QR Code อัตโนมัติจาก Link / ข้อความ
   useEffect(() => {
     async function createQR() {
       try {
@@ -30,7 +27,6 @@ export default function Home() {
         });
         setQrUrl(url);
 
-        // 🟢 ส่ง Event ไปยัง GA4 เมื่อสร้าง QR Code สำเร็จ
         if (typeof window !== "undefined" && (window as any).gtag) {
           (window as any).gtag("event", "generate_qr", {
             event_category: "engagement",
@@ -47,7 +43,6 @@ export default function Home() {
     }
   }, [tab, text]);
 
-  // ฟังก์ชันส่ง Feedback เข้า Google Sheets
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!feedback.trim() || isSubmitting) return;
@@ -90,24 +85,24 @@ export default function Home() {
           ไม่มีลายน้ำ • ไม่จำกัดจำนวนครั้ง • ปลอดภัย 100%
         </p>
 
-        {/* ปุ่มสลับ Tab */}
-        <div className="flex bg-slate-100 p-1 rounded-xl mb-6">
+        {/* ปุ่มสลับ Tab (เพิ่มปุ่ม Tarot) */}
+        <div className="flex bg-slate-100 p-1 rounded-xl mb-6 overflow-x-auto">
           <button
             type="button"
             onClick={() => setTab("link")}
-            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition ${
+            className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition whitespace-nowrap ${
               tab === "link"
                 ? "bg-white text-blue-600 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            สร้าง QR Code (Link)
+            สร้าง QR
           </button>
 
           <button
             type="button"
             onClick={() => setTab("astro")}
-            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition ${
+            className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition whitespace-nowrap ${
               tab === "astro"
                 ? "bg-white text-blue-600 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
@@ -116,23 +111,49 @@ export default function Home() {
             🌟 ดวงดาว
           </button>
 
+          {/* 2. เพิ่มปุ่มกดเลือกแท็บ Tarot */}
+          <button
+            type="button"
+            onClick={() => setTab("tarot")}
+            className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition whitespace-nowrap ${
+              tab === "tarot"
+                ? "bg-white text-purple-600 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            🔮 ไพ่ Tarot
+          </button>
+{/* 3. เพิ่มปุ่มกดเลือกแท็บ PDF */}
+          <button
+            type="button"
+            onClick={() => setTab("PDF")}
+            className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition whitespace-nowrap ${
+              tab === "PDF"
+                ? "bg-white text-amber-600 shadow-sm"
+                : "text-slate-600 hover:text-slate-900"
+            }`}
+          >
+            📄 PDF
+          </button>
+
+
+
           <button
             type="button"
             onClick={() => setTab("donate")}
-            className={`flex-1 py-2 text-sm font-semibold rounded-lg transition ${
+            className={`flex-1 py-2 px-2 text-xs font-semibold rounded-lg transition whitespace-nowrap ${
               tab === "donate"
                 ? "bg-white text-amber-600 shadow-sm"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
-            ☕ สนับสนุนผู้พัฒนา
+            ☕ สนับสนุน
           </button>
         </div>
 
-        {/* 2. แก้ไขการเช็คเงื่อนไข Tab ด้วย Nested Ternary ที่ถูกต้อง */}
-        {tab === "link" ? (
+        {/* 3. เงื่อนไขการแสดงผลแต่ละ Tab */}
+        {tab === "link" && (
           <div>
-            {/* ฟอร์มกรอก Link */}
             <div className="space-y-4 text-left mb-6">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -148,7 +169,6 @@ export default function Home() {
               </div>
             </div>
 
-            {/* แสดงผล QR Code */}
             <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-4 min-h-[220px] flex items-center justify-center mb-4">
               {qrUrl ? (
                 <img
@@ -161,7 +181,6 @@ export default function Home() {
               )}
             </div>
 
-            {/* ปุ่มดาวน์โหลด */}
             {qrUrl && (
               <a
                 href={qrUrl}
@@ -172,11 +191,60 @@ export default function Home() {
               </a>
             )}
           </div>
-        ) : tab === "donate" ? (
-          /* Tab สนับสนุนผู้พัฒนา */
+        )}
+
+        {tab === "astro" && (
+          <div className="bg-purple-50/60 p-5 rounded-2xl border border-purple-200/60 mb-6">
+            <h3 className="font-bold text-purple-800 text-base mb-1">
+              🌟 ดวงดาว
+            </h3>
+            <div className="flex justify-center my-3">
+              <Link
+                href="/astro"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+              >
+                ดูดาว Astro
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {tab === "tarot" && (
+          <div className="bg-indigo-50/60 p-5 rounded-2xl border border-indigo-200/60 mb-6">
+            <h3 className="font-bold text-indigo-800 text-base mb-1">
+              🔮 ทำนายไพ่ Tarot
+            </h3>
+            <div className="flex justify-center my-3">
+              <Link
+                href="/tarot"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+              >
+                เริ่มทำนายไพ่ Tarot
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {tab === "PDF" && (
+          <div className="bg-blue-50/60 p-5 rounded-2xl border border-blue-200/60 mb-6">
+            <h3 className="font-bold text-blue-800 text-base mb-1">
+              📄 แปลงไฟล์ PDF
+            </h3>
+            <div className="flex justify-center my-3">
+              <Link
+                href="/PDF"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition"
+              >
+                ใช้งานฟังก์ชัน PDF
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {tab === "donate" && (
           <div className="bg-amber-50/60 p-5 rounded-2xl border border-amber-200/60 mb-6">
             <h3 className="font-bold text-amber-800 text-base mb-1">
-              ☕ เลี้ยงกาแฟผู้พัฒนา
+              เลี้ยงกาแฟผู้พัฒนา
             </h3>
             <p className="text-xs text-slate-600 mb-4">
               หากเครื่องมือนี้มีประโยชน์ สามารถร่วมสนับสนุนค่ากาแฟ/เซิร์ฟเวอร์ได้ครับ
@@ -191,21 +259,6 @@ export default function Home() {
             <p className="text-[11px] text-slate-400">
               พร้อมเพย์ ธนาคารกรุงไทย
             </p>
-          </div>
-        ) : (
-          /* Tab ดวงดาว */
-          <div className="bg-amber-50/60 p-5 rounded-2xl border border-amber-200/60 mb-6">
-            <h3 className="font-bold text-amber-800 text-base mb-1">
-              🌟 ดวงดาว
-            </h3>
-            <div className="flex justify-center mb-2">
-              <Link
-                href="/astro"
-                className="text-blue-600 hover:underline text-sm font-medium"
-              >
-                ดูดาว Astro
-              </Link>
-            </div>
           </div>
         )}
 
