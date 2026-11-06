@@ -141,6 +141,55 @@ const RUEK = [
 ];
 
 // ---------------------------------------------------------------------------
+// คำอธิบายแบบภาษาง่าย (ใช้ในสรุป วันนี้ / เดือนนี้ / ปีนี้) — แก้ถ้อยคำได้ตามต้องการ
+// ---------------------------------------------------------------------------
+const HOUSE_PLAIN = [
+  "ตัวเอง สุขภาพ และภาพลักษณ์",
+  "เงินทอง รายได้ การพูดจา",
+  "เพื่อนฝูง การติดต่อ การเดินทางใกล้ ๆ",
+  "บ้าน ครอบครัว ที่อยู่อาศัย รถ",
+  "ลูก ลูกน้อง สัตว์เลี้ยง",
+  "ปัญหาจุกจิก คู่แข่ง สุขภาพ",
+  "ความรัก คู่ครอง คู่ค้า",
+  "ความไม่คาดคิด การสูญเสีย เงินที่เกี่ยวกับคนอื่น",
+  "โชคดี ผู้ใหญ่ การเดินทางไกล การเรียนรู้",
+  "งาน อาชีพ หน้าที่",
+  "ผู้สนับสนุน ลาภผล เพื่อนสนิท",
+  "ความลับ ความเหนื่อยล้า ศัตรูลับ การพักผ่อน",
+];
+const PLAIN_EFFECT: Record<string, string> = {
+  "1": "เกียรติยศ หัวหน้า ผู้ใหญ่",
+  "2": "อารมณ์และความรู้สึก",
+  "3": "ความใจร้อน ทะเลาะ อุบัติเหตุ",
+  "4": "การพูดคุย เอกสาร การเจรจา",
+  "5": "ผู้ใหญ่ ครูอาจารย์ โอกาสดี ๆ",
+  "6": "ความรัก ความสุข การใช้จ่าย",
+  "7": "งานหนัก อุปสรรค ความเหนื่อย",
+  "8": "ความหลงผิด การถูกหลอกหรือใส่ร้าย ของมึนเมา",
+  "9": "เรื่องเก่า ๆ ที่ย้อนมา เรื่องลี้ลับ",
+  "0": "เรื่องไม่คาดฝัน การเปลี่ยนแปลงกะทันหัน",
+  N: "ความคลุมเครือ ถูกหลอก เรื่องลับ",
+  P: "แรงกดดันที่มองไม่เห็น การสูญเสียหรือพลัดพราก",
+};
+const THAKSA_GOOD = ["เดช", "ศรี", "มูละ", "มนตรี", "อุตสาหะ"]; // ตำแหน่งทักษาที่ถือว่าเป็นวันดี
+
+/** สร้างรายการสรุปภาษาง่าย: ดี / ระวัง / เหมาะกับ / ไม่เหมาะกับ */
+function plainItem(head: string, text: string, tone: Tone, goods: string[], bads: string[], suit: string[], avoid: string[]): Item {
+  const sec = (title: string, lines: string[], empty: string) => [title, ...(lines.length ? lines : [empty]).map((l) => `• ${l}`)];
+  return {
+    head,
+    text,
+    tone,
+    sub: [
+      ...sec("ดี:", goods, "ยังไม่มีแรงหนุนที่เด่นชัด"),
+      ...sec("ระวัง:", bads, "ไม่มีเรื่องที่น่ากังวลเป็นพิเศษ"),
+      ...sec("เหมาะกับ:", suit, "ทำงานและใช้ชีวิตตามปกติ"),
+      ...sec("ไม่เหมาะกับ:", avoid, "ไม่มีข้อห้ามเป็นพิเศษ"),
+    ],
+  };
+}
+
+// ---------------------------------------------------------------------------
 // ตัวช่วย
 // ---------------------------------------------------------------------------
 const signIdx = (chart: ChartResult, c: string) => THAI_ZODIACS.indexOf(chart.planets[c].zodiac);
@@ -641,6 +690,185 @@ export function buildReading(natal: ChartResult, now: ChartResult, hasTime: bool
     if (hasTime && badHits.some((h) => h.planet === "N")) sub.push("เนปจูนเป็นประธานฝ่ายบาปเคราะห์ในระบบพลูหลวง เมื่อให้โทษมักรุนแรง ควรระวังเรื่องการถูกหลอกลวงและเรื่องเร้นลับ");
     sub.push(`วันนี้ (ตำราทั่วไป): เป็นวัน${THAKSA[todayPos].pos}ของคุณ — ${THAKSA[todayPos].advice}`);
     summary.push({ head: "ข้อแนะนำ", text: "แนวทางตามแนวโน้มข้างต้น ใช้ประกอบการตัดสินใจ", tone: "กลาง", sub });
+  }
+
+  // ---------- สรุปแบบภาษาง่าย: วันนี้ / เดือนนี้ / ปีนี้ (แสดงไว้บนสุด) ----------
+  {
+    type Verdict = "ดี" | "ผสม" | "ร้าย";
+    const hs = (h: number) => HOUSE_PLAIN[h - 1];
+    const dust = (h: number) => HOUSES[h - 1].dusthana;
+    const hn = (c: string) => houseOf(signIdx(now, c), lagna); // ใช้เมื่อรู้เวลาเกิดเท่านั้น
+    const retroNow = (c: string) => isRetrograde(now.planets[c]);
+    const uniq = (list: { planet: string }[]) => new Set(list.map((x) => x.planet)).size;
+    const notes = (list: { planet: string }[], kind: "good" | "bad", skip: string[] = []) =>
+      Array.from(new Set(list.map((x) => x.planet)))
+        .filter((p) => !skip.includes(p))
+        .map((p) =>
+          kind === "good"
+            ? `${nameOf(p)}ส่งแรงหนุน → ${PLAIN_EFFECT[p]}`
+            : natureOf(p) === "ศุภ"
+              ? `${nameOf(p)}ทำมุมไม่ดี → เรื่อง${PLAIN_EFFECT[p]}อาจไม่ราบรื่น`
+              : `${nameOf(p)}ส่งแรงกด → ${PLAIN_EFFECT[p]}`
+        );
+    const pick = (score: number): Verdict => (score >= 2 ? "ดี" : score <= -2 ? "ร้าย" : "ผสม");
+
+    // --- วันนี้ ---
+    const dayHits = ["2", "3", "1", "4", "6"].flatMap((c) =>
+      hitsFor(c, signIdx(now, c), targets)
+        .filter((h) => keyTargets.includes(h.key))
+        .map((h) => ({ ...h, planet: c }))
+    );
+    const dGood = dayHits.filter((h) => h.tone === "ดี");
+    const dBad = dayHits.filter((h) => h.tone === "ร้าย");
+    const tk = THAKSA[todayPos];
+    const tkGood = THAKSA_GOOD.includes(tk.pos);
+    const tkBad = tk.pos === "กาลกิณี";
+    const moonH = hasTime ? hn("2") : 0;
+    const moonDust = hasTime && dust(moonH);
+    const dTone = pick((tkGood ? 1 : 0) - (tkBad ? 1 : 0) + uniq(dGood) - uniq(dBad) - (moonDust ? 1 : 0));
+    const dGoods = [
+      ...(tkGood ? [`วันนี้เป็นวัน${tk.pos}ของคุณ (ตำราทั่วไป) ถือเป็นวันที่ดี`] : []),
+      ...notes(dGood, "good"),
+    ];
+    const dBads = [
+      ...(tkBad || tk.pos === "อายุ" ? [`วันนี้เป็นวัน${tk.pos}ของคุณ (ตำราทั่วไป) — ${tk.advice}`] : []),
+      ...(moonDust ? [`จันทร์จรเข้าภพที่มักมีปัญหา (ภพ${HOUSES[moonH - 1].name}) ใจอาจหวั่นไหวหรือเหนื่อยง่าย โดยเฉพาะเรื่อง${hs(moonH)}`] : []),
+      ...notes(dBad, "bad"),
+    ];
+    const dSuit = [
+      ...(tkGood || tk.pos === "บริวาร" ? [tk.advice.replace(/^เหมาะกับ/, "")] : []),
+      ...(hasTime && !moonDust ? [`เรื่อง${hs(moonH)} (ใจและความสนใจของคุณวันนี้ไปทางนี้)`] : []),
+    ];
+    const dAvoid = [
+      ...(tkBad ? ["เริ่มเรื่องสำคัญใหม่ ๆ"] : []),
+      ...(dBad.some((h) => h.planet === "3") ? ["ตัดสินใจตอนอารมณ์ร้อน ขับรถหรือทำงานเสี่ยง"] : []),
+      ...(dTone === "ร้าย" ? ["ตัดสินใจเรื่องใหญ่แบบเสี่ยง"] : []),
+    ];
+    const dayText: Record<Verdict, string> = {
+      ดี: "วันนี้ค่อนข้างดี ทำเรื่องสำคัญได้",
+      ผสม: "วันนี้ธรรมดา มีทั้งเรื่องดีและเรื่องที่ต้องระวัง",
+      ร้าย: "วันนี้ควรระวัง ไม่เหมาะกับการตัดสินใจใหญ่",
+    };
+
+    // --- เดือนนี้ (ดูจากอาทิตย์ ศุกร์ พุธ อังคาร ที่เดินเร็วพอจะเห็นผลระดับเดือน) ---
+    const mGoods: string[] = [];
+    const mBads: string[] = [];
+    const mSuit: string[] = [];
+    const mAvoid: string[] = [];
+    let mScore = 0;
+    if (hasTime) {
+      const sunH = hn("1");
+      if (dust(sunH)) {
+        mScore -= 1;
+        mBads.push(`จุดเด่นของเดือนอยู่ที่เรื่อง${hs(sunH)} แต่เป็นภพที่มักมีปัญหา ต้องระวัง (อาทิตย์จร)`);
+      } else {
+        mScore += 1;
+        mGoods.push(`จุดเด่นของเดือนอยู่ที่เรื่อง${hs(sunH)} (อาทิตย์จร)`);
+        mSuit.push(`เรื่อง${hs(sunH)}`);
+      }
+      const venH = hn("6");
+      if (dust(venH)) {
+        mScore -= 1;
+        mBads.push(`ความสุขสบายและการใช้จ่ายเรื่อง${hs(venH)}ต้องระวัง (ศุกร์จรภพที่มีปัญหา)`);
+      } else {
+        mScore += 1;
+        mGoods.push(`ความสุข ความรัก ความพอใจ มาทางเรื่อง${hs(venH)} (ศุกร์จร)`);
+      }
+      const merH = hn("4");
+      if (dust(merH)) {
+        mScore -= 1;
+        mBads.push(`การพูดคุยหรือเอกสารเรื่อง${hs(merH)}อาจติดขัด (พุธจรภพที่มีปัญหา)`);
+      } else {
+        mScore += 1;
+        mGoods.push(`การพูดคุย เจรจา เอกสาร ราบรื่นในเรื่อง${hs(merH)} (พุธจร)`);
+        mSuit.push(`เจรจาหรือทำเอกสารเรื่อง${hs(merH)}`);
+      }
+      const marH = hn("3");
+      if (dust(marH)) mScore -= 1;
+      mBads.push(`ระวังใจร้อนและความขัดแย้งในเรื่อง${hs(marH)}${dust(marH) ? " (หนักกว่าปกติเพราะเป็นภพที่มักมีปัญหา)" : ""} (อังคารจร)`);
+      mAvoid.push(`เถียงหรือตัดสินใจด้วยอารมณ์ในเรื่อง${hs(marH)}`);
+    } else {
+      for (const c of ["1", "6", "4"]) {
+        const dg = dignity(c, signIdx(now, c));
+        if (dg === "เกษตร" || dg === "อุจจ์") {
+          mScore += 1;
+          mGoods.push(`${nameOf(c)}จรมีกำลังดี → เรื่อง${PLAIN_EFFECT[c]}เด่นขึ้น`);
+        } else if (dg === "ประ" || dg === "นิจ") {
+          mScore -= 1;
+          mBads.push(`${nameOf(c)}จรอ่อนกำลัง → เรื่อง${PLAIN_EFFECT[c]}ติดขัด`);
+        }
+      }
+      mBads.push("ระวังใจร้อนและความขัดแย้ง (อังคารจร)");
+      mAvoid.push("เถียงหรือตัดสินใจด้วยอารมณ์");
+    }
+    if (retroNow("4")) mBads.push("พุธพักร: ผลช้าลง เหมาะทบทวนเอกสารมากกว่าเริ่มใหม่");
+    if (retroNow("6")) mBads.push("ศุกร์พักร: ผลช้าลง เรื่องความรักและการใช้จ่ายควรทบทวนมากกว่าเริ่มใหม่");
+    if (badHits.length > goodHits.length) {
+      mScore -= 1;
+      mBads.push("เบื้องหลังมีแรงกดดันจากดาวจรช้าอยู่ (ดูหัวข้อ \"ดาวจรที่กระทบดวงกำเนิดตอนนี้\")");
+    } else if (goodHits.length > badHits.length) {
+      mScore += 1;
+      mGoods.push("เบื้องหลังมีแรงหนุนจากดาวจรช้าอยู่");
+    }
+    const mTone = pick(mScore);
+    if (mTone === "ร้าย") mAvoid.push("ตัดสินใจเรื่องใหญ่แบบเร่งรีบ");
+    const monthText: Record<Verdict, string> = {
+      ดี: "เดือนนี้ค่อนข้างดี เรื่องทั่วไปราบรื่น",
+      ผสม: "เดือนนี้ธรรมดา มีทั้งเรื่องดีและเรื่องที่ต้องระวัง",
+      ร้าย: "เดือนนี้ต้องระวัง อย่ารีบตัดสินใจเรื่องใหญ่",
+    };
+
+    // --- ปีนี้ (ลัคนาจรตามอายุ + ดาวเสวยอายุ + พฤหัสบดี/เสาร์ + ดาวจรช้า) ---
+    const yGoods: string[] = [];
+    const yBads: string[] = [];
+    const ySuit: string[] = [];
+    const yAvoid: string[] = [];
+    if (hasTime && jonHouse) {
+      if (jonDust) {
+        yBads.push(`ปีนี้ลัคนาจรเข้าภพ${HOUSES[jonHouse - 1].name} ซึ่งเป็นภพที่ต้องระวัง — ระวังเจ็บไข้ อุบัติเหตุ และการสูญเสีย โดยเฉพาะเรื่อง${hs(jonHouse)}`);
+        yAvoid.push(`ตัดสินใจเสี่ยงเรื่อง${hs(jonHouse)}`);
+      } else {
+        yGoods.push(`ปีนี้เน้นเรื่อง${hs(jonHouse)} (ลัคนาจรภพ${HOUSES[jonHouse - 1].name})`);
+        ySuit.push(`ลงแรงกับเรื่อง${hs(jonHouse)}`);
+      }
+    }
+    if (dasaHead && dasaTone === "ดี") yGoods.push("ดาวประจำช่วงอายุปีนี้ส่งเสริมกัน ปีนี้มีแรงส่ง");
+    else if (dasaHead && dasaTone === "ร้าย") yBads.push("ดาวประจำช่วงอายุปีนี้ให้ผลหนัก ต้องใช้ความอดทน");
+    if (hasTime) {
+      const jH = hn("5");
+      const sH = hn("7");
+      const jBad = badHits.some((h) => h.planet === "5");
+      const jGood = goodHits.some((h) => h.planet === "5");
+      const jRetro = retroNow("5") ? " (พักร ผลช้า)" : "";
+      if (dust(jH)) yBads.push(`พฤหัสบดีจรเข้าภพที่มักมีปัญหา แรงหนุนเรื่อง${hs(jH)}จึงลดลง${jRetro}`);
+      else if (jBad) yBads.push(`พฤหัสบดีทำมุมไม่ดีกับตัวคุณ แรงหนุนเรื่อง${hs(jH)}จึงไม่เต็มที่${jRetro}`);
+      else {
+        yGoods.push(`โอกาสดีและผู้ใหญ่เกื้อหนุนมาทางเรื่อง${hs(jH)} (พฤหัสบดีจร)${jGood ? " และทำมุมดีกับตัวคุณ" : ""}${jRetro}`);
+        ySuit.push(`ขอความช่วยเหลือหรือคำแนะนำจากผู้ใหญ่ เรื่อง${hs(jH)}`);
+      }
+      yBads.push(`ต้องแบกภาระหรือเหนื่อยในเรื่อง${hs(sH)} (เสาร์จร)${dust(sH) ? " — หนักกว่าปกติ" : ""}${retroNow("7") ? " (พักร ผลช้า)" : ""}`);
+      yAvoid.push(`หักโหมหรือรับภาระเรื่อง${hs(sH)}เกินตัว`);
+    }
+    yGoods.push(...notes(goodHits, "good", ["5", "7"]));
+    yBads.push(...notes(badHits, "bad", ["5", "7"]));
+    if (badHits.some((h) => h.planet === "N")) yAvoid.push("เชื่อหรือเซ็นข้อเสนอที่ไม่ชัดเจน (เนปจูนจร)");
+    if (overall.tone === "ร้าย") yAvoid.push("ลงทุนหรือเปลี่ยนแปลงชีวิตแบบเสี่ยง");
+    if (overall.tone === "ดี") ySuit.push("เริ่มเรื่องสำคัญที่เตรียมไว้แล้ว");
+    const yTone: Verdict = overall.tone === "ดี" ? "ดี" : overall.tone === "ร้าย" ? "ร้าย" : "ผสม";
+    const yearText: Record<Verdict, string> = {
+      ดี: "ปีนี้ค่อนข้างราบรื่น มีแรงหนุนมากกว่าแรงกด",
+      ผสม: "ปีนี้มีทั้งโอกาสและอุปสรรคพอ ๆ กัน",
+      ร้าย: "ปีนี้ต้องระวัง มีแรงกดดันมากกว่าแรงหนุน",
+    };
+
+    const mHead = `เดือนนี้ · ${MONTHS_TH[Number(nDate.slice(5, 7)) - 1]} ${Number(nDate.slice(0, 4)) + 543}`;
+    const yearItem = plainItem(`ปีนี้ · อายุเต็ม ${age} ปี`, yearText[yTone], yTone, yGoods, yBads, ySuit, yAvoid);
+    yearItem.sub?.push("หมายเหตุ: สรุปนี้เป็นแนวโน้มแบบง่าย ๆ จากดาวจรและเกณฑ์อายุ ใช้ประกอบการตัดสินใจ ไม่ใช่คำตัดสิน รายละเอียดเต็มอยู่ในหัวข้อด้านล่าง");
+    summary.unshift(
+      plainItem(`วันนี้ · ${thaiDay(nDate)}`, dayText[dTone], dTone, dGoods, dBads, dSuit, dAvoid),
+      plainItem(mHead, monthText[mTone], mTone, mGoods, mBads, mSuit, mAvoid),
+      yearItem
+    );
   }
 
   return { hasTime, summary, sections };
