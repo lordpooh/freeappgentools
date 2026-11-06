@@ -2,7 +2,7 @@
 // อ้างอิงหลัก: "กฎเกณฑ์การพิจารณาดวงชะตา ระบบพลูหลวง" (สำนักโหรพลูโต) และเอกสารเนปจูน/พลูโต/มฤตยูที่ผู้ใช้ให้มา
 // ข้อมูลทุกอย่างอยู่ในตารางด้านบนของไฟล์ แก้ข้อความหรือกฎให้ตรงกับตำราได้โดยไม่ต้องแตะตรรกะด้านล่าง
 // หมายเหตุ: แบคคัส (บ) เป็นดาวในระบบนี้ แต่แอปยังไม่คำนวณตำแหน่ง จึงไม่นำมาแปลผล (ใช้เพียงเป็นดาวเกษตรของราศีพฤษภ)
-import { THAI_ZODIACS, isRetrograde, type ChartResult } from "./thai-astro";
+import { THAI_ZODIACS, isRetrograde, type ChartResult, type DayPos } from "./thai-astro";
 
 export type Tone = "ดี" | "ร้าย" | "ผสม" | "กลาง";
 export type Item = { head?: string; text: string; tone?: Tone; sub?: string[] };
@@ -609,4 +609,223 @@ export function buildReading(natal: ChartResult, now: ChartResult, hasTime: bool
   }
 
   return { hasTime, summary, sections };
+}
+
+// ---------------------------------------------------------------------------
+// พยากรณ์อนาคตใกล้: ดาวจรล่วงหน้า (ย้ายราศี พักร) เทียบกับดวงกำเนิด ตามกฎมุมของพลูหลวง
+// ---------------------------------------------------------------------------
+const MONTHS_TH = [
+  "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+  "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+];
+const thaiDay = (date: string) => {
+  const [y, m, d] = date.split("-").map(Number);
+  return `${d} ${MONTHS_TH[m - 1]} ${y + 543}`;
+};
+const EVENT_CODES = ["1", "3", "4", "5", "6", "7", "8", "9", "0", "N", "P"]; // ดาวที่แจ้งเมื่อย้ายราศี (ไม่รวมจันทร์)
+const STATION_CODES = ["3", "4", "5", "6", "7", "0", "N", "P"]; // ดาวที่แจ้งเมื่อเริ่มพักร/กลับเดินหน้า
+const SLOW_CODES = ["5", "7", "8", "9", "0", "N", "P"];
+
+type Target = { key: string; label: string; sign: number; nature: "ศุภ" | "บาป" | null };
+
+function makeTargets(natal: ChartResult, hasTime: boolean) {
+  const lagna = hasTime ? THAI_ZODIACS.indexOf(natal.lagna.zodiac) : -1;
+  const lordC = hasTime ? KASET[lagna].find((x) => x !== "B") : undefined;
+  const targets: Target[] = [];
+  if (hasTime) {
+    targets.push({ key: "lagna", label: "ลัคนา", sign: lagna, nature: null });
+    if (lordC) targets.push({ key: "lord", label: `ดาวเจ้าเรือนลัคน์ (${nameOf(lordC)})`, sign: signIdx(natal, lordC), nature: natureOf(lordC) });
+  }
+  targets.push({ key: "1", label: "อาทิตย์กำเนิด", sign: signIdx(natal, "1"), nature: "ศุภ" });
+  targets.push({ key: "2", label: "จันทร์กำเนิด", sign: signIdx(natal, "2"), nature: "ศุภ" });
+  return { lagna, targets, keyTargets: hasTime ? ["lagna", "lord"] : ["1", "2"] };
+}
+
+function hitsFor(c: string, sign: number, targets: Target[]) {
+  return targets.map((t) => {
+    const ang = angleOf(sign, t.sign);
+    const j = judge(natureOf(c), t.nature, ang);
+    return { key: t.key, tone: j.tone, text: j.text, label: `${nameOf(c)}จร ${ANGLE_LABEL[ang]} ${t.label}` };
+  });
+}
+
+function dasaPairOf(age: number) {
+  const n = Math.max(1, age);
+  if (n > 100) return null;
+  const p = Math.floor((n - 1) / 10);
+  const k = ((n - 1) % 10) + 1;
+  return { ruler: AGE_ORDER[p], sub: AGE_ORDER[(p + k - 1) % 10] };
+}
+
+function dasaRelation(ruler: string, sub: string, natal: ChartResult): { tone: Tone; rel: string } {
+  if (ruler === sub) return { tone: dignityTone(dignity(ruler, signIdx(natal, ruler))), rel: "ดาวเสวยอายุและเสวยแทรกเป็นดวงเดียวกัน ผลเด่นชัดตามดาวนั้น" };
+  if (isPair(ENEMY_PAIRS, ruler, sub)) return { tone: "ร้าย", rel: "ดาวเสวยอายุและเสวยแทรกเป็นคู่ศัตรูกัน มีแนวโน้มขัดแย้งหรือเจออุปสรรค" };
+  if (isPair(FRIEND_PAIRS, ruler, sub)) return { tone: "ดี", rel: "ดาวเสวยอายุและเสวยแทรกเป็นคู่มิตรกัน ส่งเสริมกัน" };
+  if (natureOf(ruler) === "ศุภ" && natureOf(sub) === "ศุภ") return { tone: "ดี", rel: "ทั้งคู่เป็นศุภเคราะห์ ให้คุณ" };
+  if (natureOf(ruler) === "บาป" && natureOf(sub) === "บาป") return { tone: "ร้าย", rel: "ทั้งคู่เป็นบาปเคราะห์ ต้องอดทนและระมัดระวัง" };
+  return { tone: "ผสม", rel: "ศุภเคราะห์กับบาปเคราะห์ ผลปนกัน" };
+}
+
+const toneOfHits = (hs: { key: string; tone: Tone }[], keys: string[]): Tone => {
+  const k = hs.filter((h) => keys.includes(h.key));
+  const g = k.filter((h) => h.tone === "ดี").length;
+  const b = k.filter((h) => h.tone === "ร้าย").length;
+  return g > b ? "ดี" : b > g ? "ร้าย" : "ผสม";
+};
+
+/**
+ * days = ไทม์ไลน์รายวันจาก computeTimeline (วันแรก = วันนี้)
+ * คืนส่วน "แนวโน้มรายเดือน" และ "ปฏิทินดาวจรล่วงหน้า"
+ */
+export function buildForecast(natal: ChartResult, days: DayPos[], hasTime: boolean, gender: Gender = undefined): Section[] {
+  if (days.length < 3) return [];
+  const { lagna, targets, keyTargets } = makeTargets(natal, hasTime);
+  const signAt = (d: DayPos, c: string) => Math.floor(d.arc[c] / 1800) % 12;
+  const diff = (a: number, b: number) => {
+    let x = b - a;
+    if (x > 10800) x -= 21600;
+    if (x <= -10800) x += 21600;
+    return x;
+  };
+  const retroAt = (i: number, c: string) => diff(days[i].arc[c], days[i + 1].arc[c]) < 0;
+
+  // ---------- แนวโน้มรายเดือน (ใช้ดาวจรช้า ณ กลางเดือนของแต่ละเดือน) ----------
+  const groups = new Map<string, number[]>();
+  days.forEach((d, i) => {
+    const key = d.date.slice(0, 7);
+    groups.set(key, [...(groups.get(key) ?? []), i]);
+  });
+  const monthItems: Item[] = [];
+  const monthKeys: string[] = [];
+  for (const [key, idxs] of groups) {
+    const i = idxs[Math.floor(idxs.length / 2)];
+    const d = days[i];
+    const all = [...SLOW_CODES, "3"].flatMap((c) => hitsFor(c, signAt(d, c), targets).map((h) => ({ ...h, planet: c })));
+    const k = all.filter((h) => keyTargets.includes(h.key));
+    const g = k.filter((h) => h.tone === "ดี");
+    const b = k.filter((h) => h.tone === "ร้าย");
+    const score = g.length - b.length;
+    const tone: Tone = score >= 2 ? "ดี" : score <= -2 ? "ร้าย" : "ผสม";
+    const [y, m] = key.split("-").map(Number);
+    const sub: string[] = [`คำนวณจากตำแหน่งดาวจรช้าและอังคาร ณ ${thaiDay(d.date)} · มุมให้คุณ ${g.length} จุด · มุมให้โทษ ${b.length} จุด`];
+    if (hasTime) {
+      for (const c of ["5", "7"]) {
+        const h = houseOf(signAt(d, c), lagna);
+        sub.push(`${nameOf(c)}จรภพ${HOUSES[h - 1].name}: เรื่อง${houseTheme(h, gender)}`);
+      }
+    }
+    if (g.length) sub.push(`มุมให้คุณ: ${g.map((h) => h.label).join(" · ")}`);
+    if (b.length) sub.push(`มุมให้โทษ: ${b.map((h) => h.label).join(" · ")}`);
+    monthKeys.push(key);
+    monthItems.push({
+      head: `${MONTHS_TH[m - 1]} ${y + 543}`,
+      text: tone === "ดี" ? "แรงหนุนมากกว่าแรงกดดัน" : tone === "ร้าย" ? "แรงกดดันมากกว่าแรงหนุน ควรระมัดระวัง" : "ผสมผสาน มีทั้งโอกาสและอุปสรรค",
+      tone,
+      sub,
+    });
+  }
+
+  // ---------- ปฏิทินเหตุการณ์ ----------
+  type Ev = { date: string; item: Item };
+  const events: Ev[] = [];
+  const tagSlow = (c: string) => (SLOW_CODES.includes(c) ? "ดาวจรช้า ผลระยะยาว" : "ดาวจรเร็ว ผลระยะสั้น");
+
+  for (let i = 0; i < days.length - 1; i++) {
+    for (const c of EVENT_CODES) {
+      const s0 = signAt(days[i], c);
+      const s1 = signAt(days[i + 1], c);
+      if (s0 === s1) continue;
+      const back = diff(days[i].arc[c], days[i + 1].arc[c]) < 0;
+      const hs = hitsFor(c, s1, targets);
+      const dg = dignity(c, s1);
+      const sub: string[] = [`${nameOf(c)} หมายถึง ${PLANET_INFO[c].signifies}`];
+      if (dg) sub.push(DIGNITY_TEXT[dg]);
+      if (hasTime) {
+        const h = houseOf(s1, lagna);
+        if (HOUSES[h - 1].dusthana) sub.push(`เข้าภพทุสถานะ (${HOUSES[h - 1].name}) ${natureOf(c) === "ศุภ" ? "ศุภเคราะห์ให้คุณน้อยลง" : "บาปเคราะห์ให้โทษหนักขึ้น"}`);
+      }
+      for (const h of hs) sub.push(`[${h.tone}] ${h.label}: ${h.text}`);
+      const house = hasTime ? houseOf(s1, lagna) : 0;
+      events.push({
+        date: days[i + 1].date,
+        item: {
+          head: `${thaiDay(days[i + 1].date)} · ${nameOf(c)}${back ? "ถอยกลับเข้า" : "ย้ายเข้า"}ราศี${signName(s1)}`,
+          text: `${hasTime ? `ตรงกับภพ ${house} ${HOUSES[house - 1].name}: เรื่อง${houseTheme(house, gender)} · ` : ""}${tagSlow(c)} (วันที่คลาดได้ ±1 วัน)`,
+          tone: toneOfHits(hs, keyTargets),
+          sub,
+        },
+      });
+    }
+    // พักร / กลับเดินหน้า
+    if (i >= 1 && i < days.length - 2) {
+      for (const c of STATION_CODES) {
+        const was = retroAt(i - 1, c);
+        const is = retroAt(i, c);
+        if (was === is) continue;
+        const s = signAt(days[i], c);
+        const h = hasTime ? houseOf(s, lagna) : 0;
+        events.push({
+          date: days[i].date,
+          item: {
+            head: `${thaiDay(days[i].date)} · ${nameOf(c)}${is ? "เริ่มพักร (ถอยหลัง)" : "กลับเดินหน้า"}ในราศี${signName(s)}`,
+            text: is
+              ? `ผลของ${nameOf(c)}ช้าลง เหมาะทบทวนเรื่องเดิมมากกว่าเริ่มใหม่${hasTime ? ` · เรื่อง${houseTheme(h, gender)}` : ""} · ${tagSlow(c)}`
+              : `เรื่องที่ค้างคาเกี่ยวกับ${nameOf(c)}เริ่มคลี่คลาย${hasTime ? ` · เรื่อง${houseTheme(h, gender)}` : ""} · ${tagSlow(c)}`,
+            tone: "กลาง",
+          },
+        });
+      }
+    }
+  }
+
+  // วันเกิด: ลัคนาจรเปลี่ยนภพ และดาวเสวยอายุ-แทรกเปลี่ยน
+  const [by, bm, bd] = natal.datetime_th.split(" ")[0].split("-").map(Number);
+  const first = days[0].date;
+  const last = days[days.length - 1].date;
+  for (let y = Number(first.slice(0, 4)); y <= Number(last.slice(0, 4)); y++) {
+    const day = bm === 2 && bd === 29 && !(y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)) ? 28 : bd;
+    const date = `${String(y).padStart(4, "0")}-${String(bm).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    if (date <= first || date > last || y <= by) continue;
+    const age = y - by;
+    const sub: string[] = [];
+    let tone: Tone = "กลาง";
+    let text = `ครบอายุเต็ม ${age} ปี`;
+    if (hasTime) {
+      const jon = age === 0 ? 1 : ((age - 1) % 12) + 1;
+      const js = (lagna + jon - 1) % 12;
+      sub.push(`ลัคนาจรเข้าภพ${HOUSES[jon - 1].name} (ราศี${signName(js)}): เน้นเรื่อง${houseTheme(jon, gender)}`);
+      const occ = CODES.filter((c) => signIdx(natal, c) === js);
+      sub.push(occ.length ? `ดาวเดิมในภพนี้: ${occ.map(nameOf).join(" ")}` : "ไม่มีดาวเดิมในภพนี้");
+      if (HOUSES[jon - 1].dusthana) { sub.push("เป็นภพทุสถานะ ปีนี้ควรระวังเรื่องเจ็บไข้ อุบัติเหตุ การสูญเสียหรือพลัดพราก"); tone = "ร้าย"; }
+      text += ` · ลัคนาจรเปลี่ยนเป็นภพ${HOUSES[jon - 1].name}`;
+    }
+    const dp = dasaPairOf(age);
+    if (dp) {
+      const r = dasaRelation(dp.ruler, dp.sub, natal);
+      sub.push(`ดาวเสวยอายุ ${nameOf(dp.ruler)} · เสวยแทรก ${nameOf(dp.sub)}: ${r.rel}`);
+      if (tone !== "ร้าย") tone = r.tone;
+    }
+    events.push({ date, item: { head: `${thaiDay(date)} · วันเกิดครบ ${age} ปี`, text, tone, sub } });
+  }
+
+  events.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  monthItems.forEach((mi, i) => {
+    const evs = events.filter((e) => e.date.slice(0, 7) === monthKeys[i]);
+    if (evs.length) mi.sub = [...(mi.sub ?? []), `เหตุการณ์ในเดือนนี้ (${evs.length}):`, ...evs.map((e) => `• ${e.item.head}`)];
+  });
+
+  return [
+    {
+      id: "forecast-month",
+      title: "อนาคตใกล้: แนวโน้มรายเดือน",
+      note: `ช่วง ${thaiDay(first)} ถึง ${thaiDay(last)} · นับมุมของดาวจรช้าและอังคารกับ${hasTime ? "ลัคนาและดาวเจ้าเรือนลัคน์" : "อาทิตย์และจันทร์กำเนิด"} (กติกานับแบบหยาบเพื่อดูแนวโน้ม)`,
+      items: monthItems,
+    },
+    {
+      id: "forecast-events",
+      title: "อนาคตใกล้: ปฏิทินดาวจร",
+      note: "ตำแหน่งดาวคำนวณวันละครั้งเวลา 12:00 น. วันที่ย้ายราศีหรือเปลี่ยนทิศทางจึงคลาดได้ราว ±1 วัน",
+      items: events.length ? events.map((e) => e.item) : [{ text: "ไม่มีดาวย้ายราศีหรือเปลี่ยนทิศทางในช่วงนี้" }],
+    },
+  ];
 }

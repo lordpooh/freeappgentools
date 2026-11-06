@@ -4,6 +4,7 @@
 import { calculateThaiHoroscope } from "thai-astrology";
 import { computeModernPlanets } from "./modern-planets";
 import {
+  type DayPos,
   MODERN_PLANETS,
   THAI_PLANETS,
   THAI_ZODIACS,
@@ -170,4 +171,25 @@ export async function computeChart(date: string, time: string, loc: Location): P
     lagna: { longitude: asc.longitudeDegrees, ...l, formatted: fmt(l) },
     planets,
   };
+}
+
+/**
+ * ตำแหน่งดาวรายวัน (เวลา 12:00 น. เวลาไทย) ตั้งแต่ startDate ไปอีก days วัน (รวมวันเริ่มต้น)
+ * ใช้พยากรณ์ล่วงหน้า: หาวันที่ดาวย้ายราศี / เริ่มพักร / กลับเดินหน้า
+ * ผลคือลิปดาจากเมษ 0° ของดาวสุริยยาตร์ ๑๐ ดวง + เนปจูน พลูโต (รหัสเหมือน chart.planets)
+ */
+export async function computeTimeline(startDate: string, days: number, loc: Location): Promise<DayPos[]> {
+  const start = parseYmd(startDate);
+  const out: DayPos[] = [];
+  for (let i = 0; i <= days; i++) {
+    const ymd = addDays(start, i);
+    const raw = run(ymd, 12, 0, loc);
+    const arc: Record<string, number> = {};
+    for (const pl of THAI_PLANETS) arc[pl.code] = raw.points[pl.key].longitudeArcMinutes;
+    const date = `${String(ymd.year).padStart(4, "0")}-${String(ymd.month).padStart(2, "0")}-${String(ymd.day).padStart(2, "0")}`;
+    const modern = await computeModernPlanets(date, "12:00:00");
+    for (const m of MODERN_PLANETS) arc[m.code] = modern[m.code].longitude * 60;
+    out.push({ date, arc });
+  }
+  return out;
 }

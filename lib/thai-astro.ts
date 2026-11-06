@@ -37,6 +37,9 @@ export type ChartResult = {
 
 // รหัสดาวตรงกับเลขดาวไทย: ๑ อาทิตย์ ๒ จันทร์ ๓ อังคาร ๔ พุธ ๕ พฤหัสบดี ๖ ศุกร์ ๗ เสาร์ ๘ ราหู ๙ เกตุ ๐ มฤตยู
 // key ตรงกับ points ของ thai-astrology
+/** ตำแหน่งดาวรายวัน (ลิปดาจากเมษ 0° = 0 ถึง 21600) สำหรับพยากรณ์ล่วงหน้า */
+export type DayPos = { date: string; arc: Record<string, number> };
+
 export const THAI_PLANETS = [
   { code: "1", key: "sun", name: "อาทิตย์" },
   { code: "2", key: "moon", name: "จันทร์" },

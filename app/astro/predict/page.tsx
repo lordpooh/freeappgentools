@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import ThaiWheel from "../../../components/ThaiWheel";
-import { computeChart } from "../../../lib/ephemeris";
-import { buildReading, type Gender, type Item, type Reading, type Tone } from "../../../lib/predict";
+import { computeChart, computeTimeline } from "../../../lib/ephemeris";
+import { buildForecast, buildReading, type Gender, type Item, type Reading, type Section, type Tone } from "../../../lib/predict";
 import { PLACES, parseInput, type ChartResult } from "../../../lib/thai-astro";
 
 export const metadata: Metadata = {
@@ -10,7 +10,14 @@ export const metadata: Metadata = {
 };
 
 type Props = {
-  searchParams: Promise<{ date?: string; time?: string; nt?: string; place?: string; sex?: string }>;
+  searchParams: Promise<{ date?: string; time?: string; nt?: string; place?: string; sex?: string; range?: string }>;
+};
+
+const RANGES: Record<string, { label: string; days: number }> = {
+  "1": { label: "1 เดือน", days: 31 },
+  "3": { label: "3 เดือน", days: 92 },
+  "6": { label: "6 เดือน", days: 183 },
+  "12": { label: "12 เดือน", days: 366 },
 };
 
 const inputCls =
@@ -82,6 +89,8 @@ export default async function PredictPage({ searchParams }: Props) {
   let natal: ChartResult | null = null;
   let now: ChartResult | null = null;
   let reading: Reading | null = null;
+  let forecast: Section[] = [];
+  const range = RANGES[sp.range ?? ""] ? (sp.range as string) : "3";
   let error = "";
 
   if (sp.date) {
@@ -94,6 +103,8 @@ export default async function PredictPage({ searchParams }: Props) {
         natal = await computeChart(birth.date, birth.time, birth.loc);
         now = await computeChart(today.date, today.time, birth.loc);
         reading = buildReading(natal, now, hasTime, gender);
+        const timeline = await computeTimeline(today.date, RANGES[range].days, birth.loc);
+        forecast = buildForecast(natal, timeline, hasTime, gender);
       } catch {
         error = "คำนวณไม่ได้ ตรวจสอบวันที่และเวลาเกิดอีกครั้ง";
       }
@@ -109,7 +120,7 @@ export default async function PredictPage({ searchParams }: Props) {
           กลับหน้าผังดวง
         </a>
       </p>
-      <p className="mb-3 text-sm">
+      <p className="mb-3 text-sm text-neutral-500">
         <a className="underline" href="/">
           กลับหน้าแรก →
         </a>
@@ -148,6 +159,16 @@ export default async function PredictPage({ searchParams }: Props) {
             </option>
           </select>
         </label>
+        <label className="flex flex-col gap-0.5 text-sm text-neutral-500">
+          พยากรณ์ล่วงหน้า
+          <select name="range" defaultValue={range} className={inputCls}>
+            {Object.entries(RANGES).map(([k, v]) => (
+              <option key={k} value={k} className="text-black">
+                {v.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="flex items-center gap-1.5 py-2 text-sm text-neutral-500">
           <input type="checkbox" name="nt" value="1" defaultChecked={!hasTime} />
           ไม่ทราบเวลาเกิด
@@ -174,6 +195,18 @@ export default async function PredictPage({ searchParams }: Props) {
               ))}
             </ul>
           </section>
+
+          {forecast.map((sec) => (
+            <section key={sec.id} className={card}>
+              <h2 className="text-lg font-bold">{sec.title}</h2>
+              {sec.note && <p className="mb-2 text-xs text-neutral-500">{sec.note}</p>}
+              <ul className="mt-2 space-y-2">
+                {sec.items.map((it, i) => (
+                  <ItemView key={`${sec.id}-${i}`} item={it} />
+                ))}
+              </ul>
+            </section>
+          ))}
 
           {hasTime && (
             <div className="rounded-xl border border-neutral-200 p-2 dark:border-neutral-800">
