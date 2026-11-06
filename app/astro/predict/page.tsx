@@ -175,38 +175,80 @@ function ForecastCardView({ item }: { item: Item }) {
   const mixList: string[] = [];
   const eventsList: string[] = [];
 
+  // 1. ฟังก์ชันสรุปหัวข้อบรรยาย (แปลงภพ/ดาว ให้เป็นเรื่องในชีวิตจริง)
+  const simplifyHeader = (text: string) => {
+    let t = text;
+
+    // แปลงชื่อภพดิบๆ ให้เป็นเรื่องในชีวิตจริง
+    t = t.replace(/ตรงกับภพ\s*\d+\s*กัมมะ:?\s*เรื่องการกระทำหรือกรรม\s*การศึกษา\s*การงานอาชีพ\s*การดำเนินชีวิตประจำวัน\s*\(สำคัญเทียบเท่าลัคนา\)/g, "เน้นเรื่อง: การงาน อาชีพ การเรียน และการลงมือทำ");
+    t = t.replace(/ตรงกับภพ\s*\d+\s*กฎุมพะ:?[^·]*/g, "เน้นเรื่อง: การเงิน รายได้ และการเจรจาค้าขาย");
+    t = t.replace(/ตรงกับภพ\s*\d+\s*สหัชชะ:?[^·]*/g, "เน้นเรื่อง: การเดินทาง เพื่อนฝูง และการสังคม");
+    t = t.replace(/ตรงกับภพ\s*\d+\s*พันธุ:?[^·]*/g, "เน้นเรื่อง: บ้าน ครอบครัว และอสังหาริมทรัพย์");
+    t = t.replace(/ตรงกับภพ\s*\d+\s*ปุตตะ:?[^·]*/g, "เน้นเรื่อง: ลูก บริวาร โครงการใหม่ๆ");
+    t = t.replace(/ตรงกับภพ\s*\d+\s*อริ:?[^·]*/g, "เน้นเรื่อง: ปัญหา อุปสรรค และสุขภาพที่ต้องแก้ไข");
+    t = t.replace(/ตรงกับภพ\s*\d+\s*ปัตนิ:?[^·]*/g, "เน้นเรื่อง: ความรัก คู่ครอง และหุ้นส่วน");
+    t = t.replace(/ตรงกับภพ\s*\d+\s*มรณะ:?[^·]*/g, "เน้นเรื่อง: การเปลี่ยนแปลงกะทันหัน หรือการจบเรื่องเก่า");
+    t = t.replace(/ตรงกับภพ\s*\d+\s*ศุภะ:?[^·]*/g, "เน้นเรื่อง: โชคลาภ ผู้ใหญ่สนับสนุน การเดินทางไกล");
+    t = t.replace(/ตรงกับภพ\s*\d+\s*ลาภะ:?[^·]*/g, "เน้นเรื่อง: ลาภผล ความสำเร็จ และผู้เกื้อกูล");
+    t = t.replace(/ตรงกับภพ\s*\d+\s*วินาศนะ:?[^·]*/g, "เน้นเรื่อง: เรื่องเบื้องหลัง ค่าใช้จ่ายไม่คาดคิด");
+
+    // แปลงชนิดดาวจร
+    t = t.replace(/ดาวจรเร็ว\s*ผลระยะสั้น\s*\(วันที่คลาดได้\s*±1\s*วัน\)/g, "(ส่งผลไว ช่วง 1-2 วันนี้)");
+    t = t.replace(/ดาวจรช้า\s*ผลระยะยาว[^·]*/g, "(ส่งผลยาวนาน)");
+
+    return t;
+  };
+
+  // 2. ฟังก์ชันแปลงเนื้อหารายย่อยในกล่อง
+  const simplifyText = (text: string) => {
+    let t = text.trim().replace(/^[•\-\*\s]+/, "");
+    
+    if (t.includes("พุธ")) {
+      t = t.replace(/พุธจร/g, "เรื่องการเจรจา สื่อสาร เอกสารสัญญา");
+      t = t.replace(/หมายถึง การเจรจา หนังสือ การประพันธ์ ปรับตัวง่าย อารมณ์รวนเร/g, "การพูดคุยเจรจาและงานเอกสารโดดเด่น แต่ระวังความคิดผันผวน");
+    } else if (t.includes("ศุกร์")) {
+      t = t.replace(/ศุกร์จร/g, "เรื่องความรัก การเงิน การใช้จ่าย");
+    } else if (t.includes("อังคาร")) {
+      t = t.replace(/อังคารจร/g, "เรื่องการงาน การขยันลุยงาน (ระวังใจร้อน)");
+    } else if (t.includes("พฤหัสบดี")) {
+      t = t.replace(/พฤหัสบดีจร/g, "เรื่องผู้ใหญ่ให้โอกาส การเรียนรู้ และโชคลาภ");
+    } else if (t.includes("เสาร์")) {
+      t = t.replace(/เสาร์จร/g, "เรื่องภาระงานหนัก ความกดดัน");
+    } else if (t.includes("ราหู")) {
+      t = t.replace(/ราหูจร/g, "ระวังการถูกหลอก หรือเอกสารสัญญาหลุมพราง");
+    }
+
+    t = t.replace(/ตรีโกณ|จตุโกณ \(กากบาท\)|ศูนยพาหะ|ปลายหอก|กุม\/ทับ|ตามหลัง \(ก้ามปู\)/g, "");
+    t = t.replace(/ศุภเคราะห์|บาปเคราะห์/g, "");
+    t = t.replace(/\s+/g, " ").trim();
+
+    return t;
+  };
+
   if (item.sub && item.sub.length > 0) {
     for (const rawText of item.sub) {
       const t = rawText.trim().replace(/^[•\-\*\s]+/, "");
-
       if (t.includes("มุมให้คุณ:")) {
         const parts = t.split("มุมให้คุณ:");
-        if (parts[1]) {
-          parts[1].split("·").forEach((subItem) => {
-            if (subItem.trim()) goodList.push(subItem.trim());
-          });
-        }
+        if (parts[1]) parts[1].split("·").forEach((s) => s.trim() && goodList.push(simplifyText(s)));
       } else if (t.includes("มุมให้โทษ:")) {
         const parts = t.split("มุมให้โทษ:");
-        if (parts[1]) {
-          parts[1].split("·").forEach((subItem) => {
-            if (subItem.trim()) warnList.push(subItem.trim());
-          });
-        }
+        if (parts[1]) parts[1].split("·").forEach((s) => s.trim() && warnList.push(simplifyText(s)));
       } else if (t.startsWith("เหตุการณ์ในเดือนนี้") || t.match(/^\d+\s+[ก-ฮ]+/)) {
         eventsList.push(t);
       } else {
         const m = t.match(/^\[(ดี|ร้าย|ผสม)\]\s*(.*)$/);
         if (m) {
-          if (m[1] === "ดี") goodList.push(m[2]);
-          else if (m[1] === "ร้าย") warnList.push(m[2]);
-          else mixList.push(m[2]);
-        } else if (t.includes("คำนวณจากตำแหน่งดาว") || t.includes("มุมให้คุณ")) {
-          goodList.push(t);
-        } else if (t.includes("มุมให้โทษ") || t.includes("ระวัง")) {
-          warnList.push(t);
+          const clean = simplifyText(m[2]);
+          if (m[1] === "ดี") goodList.push(clean);
+          else if (m[1] === "ร้าย") warnList.push(clean);
+          else mixList.push(clean);
+        } else if (t.includes("คำนวณจากตำแหน่งดาว") || t.includes("มุมให้คุณ") || t.includes("ให้คุณมาก")) {
+          goodList.push(simplifyText(t));
+        } else if (t.includes("มุมให้โทษ") || t.includes("ระวัง") || t.includes("ให้โทษ")) {
+          warnList.push(simplifyText(t));
         } else {
-          mixList.push(t);
+          mixList.push(simplifyText(t));
         }
       }
     }
@@ -222,7 +264,12 @@ function ForecastCardView({ item }: { item: Item }) {
               <ToneBadge tone={item.tone} />
             </div>
           )}
-          {item.text && <p className="mt-0.5 text-sm font-medium text-neutral-600 dark:text-neutral-400">{item.text}</p>}
+          {/* ปรับปรุงคำบรรยายสรุปใต้วันที่ให้เป็นภาษาคนตรงนี้ */}
+          {item.text && (
+            <p className="mt-0.5 text-sm font-medium text-neutral-600 dark:text-neutral-400">
+              {simplifyHeader(item.text)}
+            </p>
+          )}
         </div>
         <span className="ml-2 text-xl text-neutral-400 select-none">
           <span className="inline group-open:hidden">▼</span>
@@ -232,11 +279,11 @@ function ForecastCardView({ item }: { item: Item }) {
 
       <div className="mt-4 flex flex-col gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {/* กล่องดี */}
+          {/* ดี */}
           <div className="flex flex-col rounded-lg border-2 border-emerald-300 bg-emerald-50/60 p-3 dark:border-emerald-800 dark:bg-emerald-950/30">
             <div className="mb-2">
               <span className="inline-block rounded bg-emerald-600 px-2.5 py-0.5 text-xs font-bold text-white dark:bg-emerald-500">
-                ดี (มุมให้คุณ)
+                ดี (เรื่องที่เด่น)
               </span>
             </div>
             {goodList.length > 0 ? (
@@ -253,11 +300,11 @@ function ForecastCardView({ item }: { item: Item }) {
             )}
           </div>
 
-          {/* กล่องผสม / กลาง */}
+          {/* ผสม / กลาง */}
           <div className="flex flex-col rounded-lg border-2 border-amber-300 bg-amber-50/60 p-3 dark:border-amber-800 dark:bg-amber-950/30">
             <div className="mb-2">
               <span className="inline-block rounded bg-amber-500 px-2.5 py-0.5 text-xs font-bold text-white dark:bg-amber-600">
-                ผสม / กลาง
+                ผสม / กลาง (ต้องรอบคอบ)
               </span>
             </div>
             {mixList.length > 0 ? (
@@ -274,11 +321,11 @@ function ForecastCardView({ item }: { item: Item }) {
             )}
           </div>
 
-          {/* กล่องระวัง */}
+          {/* ระวัง */}
           <div className="flex flex-col rounded-lg border-2 border-red-300 bg-red-50/60 p-3 dark:border-red-800 dark:bg-red-950/30">
             <div className="mb-2">
               <span className="inline-block rounded bg-red-600 px-2.5 py-0.5 text-xs font-bold text-white dark:bg-red-500">
-                ระวัง (มุมให้โทษ)
+                ระวัง (สิ่งที่ควรเลี่ยง)
               </span>
             </div>
             {warnList.length > 0 ? (
@@ -295,20 +342,6 @@ function ForecastCardView({ item }: { item: Item }) {
             )}
           </div>
         </div>
-
-        {eventsList.length > 0 && (
-          <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-3 dark:border-neutral-800 dark:bg-neutral-800/30">
-            <div className="mb-1.5 text-xs font-bold text-neutral-500">เหตุการณ์สำคัญประจำเดือน</div>
-            <ul className="space-y-1 text-xs text-neutral-700 dark:text-neutral-300">
-              {eventsList.map((ev, idx) => (
-                <li key={idx} className="flex items-start gap-1.5">
-                  <span className="select-none text-neutral-400">•</span>
-                  <span>{ev}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
     </details>
   );
