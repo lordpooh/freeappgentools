@@ -11,7 +11,16 @@ export const metadata: Metadata = {
 };
 
 type Props = {
-  searchParams: Promise<{ date?: string; time?: string; nt?: string; place?: string; sex?: string; range?: string }>;
+  searchParams: Promise<{
+    date?: string;
+    time?: string;
+    nt?: string;
+    place?: string;
+    sex?: string;
+    range?: string;
+    month?: string;
+    year?: string;
+  }>;
 };
 
 const RANGES: Record<string, { label: string; days: number }> = {
@@ -29,6 +38,7 @@ const THAI_MONTHS = [
   "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
   "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
 ];
+
 function thaiDate(date: string) {
   const [y, m, d] = date.split("-").map(Number);
   return `${d} ${THAI_MONTHS[m - 1] ?? ""} พ.ศ.${y + 543}`;
@@ -47,224 +57,37 @@ function ToneBadge({ tone }: { tone?: Tone }) {
 }
 
 // -------------------------------------------------------------
-// 1. การ์ดสรุปภาพรวมดวงชะตา (เริ่มต้นพับไว้ ยุบทุกช่อง)
+// ฟังก์ชันสรุปภาษาคน (12 ดาว)
 // -------------------------------------------------------------
-function SummaryCardView({ item }: { item: Item }) {
-  const goodList: string[] = [];
-  const warnList: string[] = [];
-  const mixList: string[] = [];
-
-  if (item.sub && item.sub.length > 0) {
-    for (const rawText of item.sub) {
-      const t = rawText.trim().replace(/^[•\-\*\s]+/, "");
-
-      if (t.startsWith("ดี:")) {
-        goodList.push(t.replace(/^ดี:\s*/, ""));
-      } else if (t.startsWith("ระวัง:")) {
-        warnList.push(t.replace(/^ระวัง:\s*/, ""));
-      } else if (t.startsWith("กลาง:") || t.startsWith("ผสม:")) {
-        mixList.push(t.replace(/^(กลาง|ผสม):\s*/, ""));
-      } else if (t.includes("มุมให้คุณ") || t.includes("ส่งแรงหนุน") || t.startsWith("[ดี]")) {
-        goodList.push(t.replace(/^\[ดี\]\s*/, ""));
-      } else if (t.includes("มุมให้โทษ") || t.includes("ส่งแรงกด") || t.includes("ระวัง") || t.startsWith("[ร้าย]")) {
-        warnList.push(t.replace(/^\[ร้าย\]\s*/, ""));
-      } else if (t.startsWith("[ผสม]")) {
-        mixList.push(t.replace(/^\[ผสม\]\s*/, ""));
-      } else if (t.length > 0) {
-        if (item.tone === "ดี") goodList.push(t);
-        else if (item.tone === "ร้าย") warnList.push(t);
-        else mixList.push(t);
-      }
-    }
-  }
-
-  return (
-    // ถอน open ออก เพื่อให้หุบ/ยุบไว้ตั้งแต่เริ่มต้นตามสั่ง
-    <details className="group rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-      <summary className="flex w-full cursor-pointer items-center justify-between font-bold text-neutral-900 list-none dark:text-neutral-100">
-        <div>
-          {item.head && (
-            <div className="text-lg font-bold">
-              {item.head}
-              <ToneBadge tone={item.tone} />
-            </div>
-          )}
-          {item.text && <p className="mt-0.5 text-sm font-medium text-neutral-600 dark:text-neutral-400">{item.text}</p>}
-        </div>
-        {/* ลูกศร: พับอยู่ชี้ลง (▼) / กางออกชี้ขึ้น (▲) */}
-        <span className="ml-2 text-xl text-neutral-400 select-none">
-          <span className="inline group-open:hidden">▼</span>
-          <span className="hidden group-open:inline">▲</span>
-        </span>
-      </summary>
-
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
-        {/* กล่องดี (เขียว) */}
-        <div className="flex flex-col rounded-lg border-2 border-emerald-300 bg-emerald-50/60 p-3 dark:border-emerald-800 dark:bg-emerald-950/30">
-          <div className="mb-2">
-            <span className="inline-block rounded bg-emerald-600 px-2.5 py-0.5 text-xs font-bold text-white dark:bg-emerald-500">
-              ดี (มุมให้คุณ)
-            </span>
-          </div>
-          {goodList.length > 0 ? (
-            <ul className="space-y-1.5 text-sm text-emerald-950 dark:text-emerald-100 font-medium">
-              {goodList.map((line, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="select-none">•</span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="py-1 text-sm font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
-          )}
-        </div>
-
-        {/* กล่องผสม / กลาง (เหลือง) */}
-        <div className="flex flex-col rounded-lg border-2 border-amber-300 bg-amber-50/60 p-3 dark:border-amber-800 dark:bg-amber-950/30">
-          <div className="mb-2">
-            <span className="inline-block rounded bg-amber-500 px-2.5 py-0.5 text-xs font-bold text-white dark:bg-amber-600">
-              ผสม / กลาง
-            </span>
-          </div>
-          {mixList.length > 0 ? (
-            <ul className="space-y-1.5 text-sm text-amber-950 dark:text-amber-100 font-medium">
-              {mixList.map((line, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="select-none">•</span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="py-1 text-sm font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
-          )}
-        </div>
-
-        {/* กล่องระวัง (แดง) */}
-        <div className="flex flex-col rounded-lg border-2 border-red-300 bg-red-50/60 p-3 dark:border-red-800 dark:bg-red-950/30">
-          <div className="mb-2">
-            <span className="inline-block rounded bg-red-600 px-2.5 py-0.5 text-xs font-bold text-white dark:bg-red-500">
-              ระวัง (มุมให้โทษ)
-            </span>
-          </div>
-          {warnList.length > 0 ? (
-            <ul className="space-y-1.5 text-sm text-red-950 dark:text-red-100 font-medium">
-              {warnList.map((line, idx) => (
-                <li key={idx} className="flex items-start gap-2">
-                  <span className="select-none">•</span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="py-1 text-sm font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
-          )}
-        </div>
-      </div>
-    </details>
-  );
-}
-
-// -------------------------------------------------------------
-// 2. การ์ดแนวโน้มรายเดือน (เริ่มต้นพับไว้ ยุบทุกช่อง)
-// -------------------------------------------------------------
-function ForecastCardView({ item }: { item: Item }) {
-  const goodList: string[] = [];
-  const warnList: string[] = [];
-  const mixList: string[] = [];
-  const eventsList: string[] = [];
-
-  // 1. ฟังก์ชันสรุปหัวข้อบรรยาย (แปลงภพ/ดาว ให้เป็นเรื่องในชีวิตจริง)
-  const simplifyHeader = (text: string) => {
-    let t = text;
-
-    // แปลงชื่อภพดิบๆ ให้เป็นเรื่องในชีวิตจริง
-    t = t.replace(/ตรงกับภพ\s*\d+\s*กัมมะ:?\s*เรื่องการกระทำหรือกรรม\s*การศึกษา\s*การงานอาชีพ\s*การดำเนินชีวิตประจำวัน\s*\(สำคัญเทียบเท่าลัคนา\)/g, "เน้นเรื่อง: การงาน อาชีพ การเรียน และการลงมือทำ");
-    t = t.replace(/ตรงกับภพ\s*\d+\s*กฎุมพะ:?[^·]*/g, "เน้นเรื่อง: การเงิน รายได้ และการเจรจาค้าขาย");
-    t = t.replace(/ตรงกับภพ\s*\d+\s*สหัชชะ:?[^·]*/g, "เน้นเรื่อง: การเดินทาง เพื่อนฝูง และการสังคม");
-    t = t.replace(/ตรงกับภพ\s*\d+\s*พันธุ:?[^·]*/g, "เน้นเรื่อง: บ้าน ครอบครัว และอสังหาริมทรัพย์");
-    t = t.replace(/ตรงกับภพ\s*\d+\s*ปุตตะ:?[^·]*/g, "เน้นเรื่อง: ลูก บริวาร โครงการใหม่ๆ");
-    t = t.replace(/ตรงกับภพ\s*\d+\s*อริ:?[^·]*/g, "เน้นเรื่อง: ปัญหา อุปสรรค และสุขภาพที่ต้องแก้ไข");
-    t = t.replace(/ตรงกับภพ\s*\d+\s*ปัตนิ:?[^·]*/g, "เน้นเรื่อง: ความรัก คู่ครอง และหุ้นส่วน");
-    t = t.replace(/ตรงกับภพ\s*\d+\s*มรณะ:?[^·]*/g, "เน้นเรื่อง: การเปลี่ยนแปลงกะทันหัน หรือการจบเรื่องเก่า");
-    t = t.replace(/ตรงกับภพ\s*\d+\s*ศุภะ:?[^·]*/g, "เน้นเรื่อง: โชคลาภ ผู้ใหญ่สนับสนุน การเดินทางไกล");
-    t = t.replace(/ตรงกับภพ\s*\d+\s*ลาภะ:?[^·]*/g, "เน้นเรื่อง: ลาภผล ความสำเร็จ และผู้เกื้อกูล");
-    t = t.replace(/ตรงกับภพ\s*\d+\s*วินาศนะ:?[^·]*/g, "เน้นเรื่อง: เรื่องเบื้องหลัง ค่าใช้จ่ายไม่คาดคิด");
-
-    // แปลงชนิดดาวจร
-    t = t.replace(/ดาวจรเร็ว\s*ผลระยะสั้น\s*\(วันที่คลาดได้\s*±1\s*วัน\)/g, "(ส่งผลไว ช่วง 1-2 วันนี้)");
-    t = t.replace(/ดาวจรช้า\s*ผลระยะยาว[^·]*/g, "(ส่งผลยาวนาน)");
-
-    return t;
-  };
-
-  // 2. ฟังก์ชันแปลงเนื้อหารายย่อยในกล่อง
-  const simplifyText = (text: string) => {
+function simplifyText(text: string): string {
   let t = text.trim().replace(/^[•\-\*\s]+/, "");
 
-  // 1. อาทิตย์ (๑)
   if (t.includes("อาทิตย์")) {
-    t = t.replace(/อาทิตย์จร/g, "เรื่องเกียรติยศ การงาน ชื่อเสียง หรือผู้ใหญ่/หัวหน้า");
-    t = t.replace(/หมายถึง[^]*บิดา สามี งานราชการ/g, "โดดเด่นเรื่องการได้รับการยอมรับ ผลงาน หรือการสนับสนุนจากหัวหน้า");
-  } 
-  // 2. จันทร์ (๒)
-  else if (t.includes("จันทร์")) {
-    t = t.replace(/จันทร์จร/g, "เรื่องอารมณ์ ความรู้สึก การเดินทาง หรือผู้หญิง/แม่/คู่ครอง");
-    t = t.replace(/หมายถึง[^]*ชอบเดินทาง ภรรยา มารดา/g, "เน้นเรื่องความรู้สึก อารมณ์ผันผวน หรือการเดินทางใกล้ๆ");
-  } 
-  // 3. อังคาร (๓)
-  else if (t.includes("อังคาร")) {
-    t = t.replace(/อังคารจร/g, "เรื่องการลุยงาน ความขยัน (ระวังความใจร้อน ทะเลาะ หรืออุบัติเหตุ)");
-    t = t.replace(/หมายถึง[^]*ทหาร บาดเจ็บ/g, "มีพลังในการทำงานสูง แต่ต้องระวังอารมณ์ร้อนและการปะทะ");
-  } 
-  // 4. พุธ (๔)
-  else if (t.includes("พุธ")) {
+    t = t.replace(/อาทิตย์จร/g, "เรื่องเกียรติยศ ผลงาน หรือผู้ใหญ่/หัวหน้า");
+  } else if (t.includes("จันทร์")) {
+    t = t.replace(/จันทร์จร/g, "เรื่องอารมณ์ ความรู้สึก การเดินทาง หรือผู้หญิง/คู่ครอง");
+  } else if (t.includes("อังคาร")) {
+    t = t.replace(/อังคารจร/g, "เรื่องการลุยงาน ความขยัน (ระวังใจร้อน ทะเลาะ หรืออุบัติเหตุ)");
+  } else if (t.includes("พุธ")) {
     t = t.replace(/พุธจร/g, "เรื่องการเจรจา สื่อสาร เอกสารสัญญา การพูดคุย");
-    t = t.replace(/หมายถึง[^]*อารมณ์รวนเร/g, "โดดเด่นเรื่องงานเอกสารและการเจรจา แต่ระวังความคิดผันผวน");
-  } 
-  // 5. พฤหัสบดี (๕)
-  else if (t.includes("พฤหัสบดี")) {
+  } else if (t.includes("พฤหัสบดี")) {
     t = t.replace(/พฤหัสบดีจร/g, "เรื่องผู้ใหญ่สนับสนุน โอกาสดีๆ การเรียนรู้ โชคลาภ");
-    t = t.replace(/หมายถึง[^]*ความอุดมสมบูรณ์/g, "ได้รับความช่วยเหลือจากผู้ใหญ่ หรือมีโอกาสเติบโตก้าวหน้า");
-  } 
-  // 6. ศุกร์ (๖)
-  else if (t.includes("ศุกร์")) {
+  } else if (t.includes("ศุกร์")) {
     t = t.replace(/ศุกร์จร/g, "เรื่องความรัก ความสุข การเงิน โชคลาภ การใช้จ่าย");
-    t = t.replace(/หมายถึง[^]*คู่ครอง การแต่งงาน/g, "เด่นเรื่องความสัมพันธ์ การเงินเข้า หรือการซื้อความสุขให้ตัวเอง");
-  } 
-  // 7. เสาร์ (๗)
-  else if (t.includes("เสาร์")) {
+  } else if (t.includes("เสาร์")) {
     t = t.replace(/เสาร์จร/g, "เรื่องภาระงานหนัก ความกดดัน อุปสรรค หรือความเหน็ดเหนื่อย");
-    t = t.replace(/หมายถึง[^]*เจ็บไข้/g, "ต้องอดทนกับงานหนัก งานที่ต้องใช้เวลา หรือความเครียดชั่วคราว");
-  } 
-  // 8. ราหู (๘)
-  else if (t.includes("ราหู")) {
-    t = t.replace(/ราหูจร/g, "ระวังความลุ่มหลง การถูกหลอก เอกสารหลุมพราง หรือเรื่องอบายมุข");
-    t = t.replace(/หมายถึง[^]*สิ่งเสพติด อบายมุข/g, "ระวังการถูกเอาเปรียบ เรื่องคลุมเครือ หรือหลงเชื่อคำพูดคนง่าย");
-  } 
-  // 9. เกตุ (๙)
-  else if (t.includes("เกตุ")) {
-    t = t.replace(/เกตุจร/g, "เรื่องเก่าๆ ที่ย้อนกลับมา เรื่องลี้ลับ ลางสังหรณ์ หรือสิ่งศักดิ์สิทธิ์");
-    t = t.replace(/หมายถึง[^]*เรื่องอาถรรพณ์ อาเพท/g, "มีเรื่องเก่า/คนเก่าๆ ย้อนกลับมา หรือมีลางสังหรณ์แม่นยำ");
-  } 
-  // 10. มฤตยู (๐)
-  else if (t.includes("มฤตยู")) {
+  } else if (t.includes("ราหู")) {
+    t = t.replace(/ราหูจร/g, "ระวังความลุ่มหลง การถูกหลอก เอกสารหลุมพราง");
+  } else if (t.includes("เกตุ")) {
+    t = t.replace(/เกตุจร/g, "เรื่องเก่าๆ ที่ย้อนกลับมา เรื่องลี้ลับ สิ่งศักดิ์สิทธิ์");
+  } else if (t.includes("มฤตยู")) {
     t = t.replace(/มฤตยูจร/g, "เรื่องไม่คาดฝัน การเปลี่ยนแปลงกะทันหัน หรือไอเดียใหม่ๆ");
-    t = t.replace(/หมายถึง[^]*ความสนใจทางจิต/g, "มีเหตุการณ์เปลี่ยนแปลงกะทันหัน หรือต้องปรับตัวรับสิ่งใหม่");
-  } 
-  // 11. เนปจูน (N)
-  else if (t.includes("เนปจูน")) {
-    t = t.replace(/เนปจูนจร/g, "เรื่องความคลุมเครือ เรื่องลับๆ สื่อสังคม หรือระวังการถูกหลอก");
-    t = t.replace(/หมายถึง[^]*การปิดบัง สถานที่จำกัดเขตหรือห่างไกล/g, "เน้นเรื่องงานสื่อ/ออนไลน์ แต่ต้องระวังเรื่องที่ไม่ชัดเจนหรือถูกปิดบัง");
-  } 
-  // 12. พลูโต (P)
-  else if (t.includes("พลูโต")) {
-    t = t.replace(/พลูโตจร/g, "แรงกดดันลึกๆ การสูญเสีย/พลัดพราก หรือการยกเครื่องชีวิตใหม่");
-    t = t.replace(/หมายถึง[^]*แพทย์ โหราศาสตร์ วิญญาณ/g, "เกิดการเปลี่ยนแปลงเชิงลึก ต้องปล่อยวางเรื่องเก่าเพื่อเริ่มเรื่องใหม่");
+  } else if (t.includes("เนปจูน")) {
+    t = t.replace(/เนปจูนจร/g, "เรื่องความคลุมเครือ สื่อสังคมออนไลน์ หรือระวังการถูกปิดบัง");
+  } else if (t.includes("พลูโต")) {
+    t = t.replace(/พลูโตจร/g, "แรงกดดันลึกๆ การสูญเสีย/พลัดพราก หรือการปรับปรุงชีวิตใหม่");
   }
 
-  // ลบคำคำนวณทางโหราศาสตร์ที่อ่านยากออก เพื่อให้เหลือเฉพาะข้อความภาษาคน
   t = t.replace(/ตรีโกณ|จตุโกณ \(กากบาท\)|ศูนยพาหะ|ปลายหอก|กุม\/ทับ|ตามหลัง \(ก้ามปู\)|โยคหน้า|โยคหลัง|เล็ง/g, "");
   t = t.replace(/ศุภเคราะห์|บาปเคราะห์/g, "");
   t = t.replace(/ดาวเจ้าเรือนลัคน์\s*\([^)]*\)/g, "ตัวเอง");
@@ -274,159 +97,253 @@ function ForecastCardView({ item }: { item: Item }) {
   t = t.replace(/\s+/g, " ").trim();
 
   return t;
-};
+}
+
+function simplifyHeader(text: string): string {
+  let t = text;
+  t = t.replace(/ตรงกับภพ\s*\d+\s*กัมมะ:?[^·]*/g, "เน้นเรื่อง: การงาน อาชีพ การเรียน และการลงมือทำ");
+  t = t.replace(/ตรงกับภพ\s*\d+\s*กฎุมพะ:?[^·]*/g, "เน้นเรื่อง: การเงิน รายได้ และการเจรจาค้าขาย");
+  t = t.replace(/ตรงกับภพ\s*\d+\s*สหัชชะ:?[^·]*/g, "เน้นเรื่อง: การเดินทาง เพื่อนฝูง และการสังคม");
+  t = t.replace(/ตรงกับภพ\s*\d+\s*พันธุ:?[^·]*/g, "เน้นเรื่อง: บ้าน ครอบครัว และอสังหาริมทรัพย์");
+  t = t.replace(/ตรงกับภพ\s*\d+\s*ปุตตะ:?[^·]*/g, "เน้นเรื่อง: ลูก บริวาร โครงการใหม่ๆ");
+  t = t.replace(/ตรงกับภพ\s*\d+\s*อริ:?[^·]*/g, "เน้นเรื่อง: ปัญหา อุปสรรค และสุขภาพที่ต้องแก้ไข");
+  t = t.replace(/ตรงกับภพ\s*\d+\s*ปัตนิ:?[^·]*/g, "เน้นเรื่อง: ความรัก คู่ครอง และหุ้นส่วน");
+  t = t.replace(/ตรงกับภพ\s*\d+\s*มรณะ:?[^·]*/g, "เน้นเรื่อง: การเปลี่ยนแปลงกะทันหัน หรือการจบเรื่องเก่า");
+  t = t.replace(/ตรงกับภพ\s*\d+\s*ศุภะ:?[^·]*/g, "เน้นเรื่อง: โชคลาภ ผู้ใหญ่สนับสนุน การเดินทางไกล");
+  t = t.replace(/ตรงกับภพ\s*\d+\s*ลาภะ:?[^·]*/g, "เน้นเรื่อง: ลาภผล ความสำเร็จ และผู้เกื้อกูล");
+  t = t.replace(/ตรงกับภพ\s*\d+\s*วินาศนะ:?[^·]*/g, "เน้นเรื่อง: เรื่องเบื้องหลัง ค่าใช้จ่ายไม่คาดคิด");
+
+  t = t.replace(/ดาวจรเร็ว\s*ผลระยะสั้น\s*\(วันที่คลาดได้\s*±1\s*วัน\)/g, "(ส่งผลไว ช่วง 1-2 วันนี้)");
+  t = t.replace(/ดาวจรช้า\s*ผลระยะยาว[^·]*/g, "(ส่งผลยาวนาน)");
+  return t;
+}
+
+// -------------------------------------------------------------
+// Component กราฟชีวิตรายวัน (Daily Life Graph)
+// -------------------------------------------------------------
+function DailyLifeChart({ forecast }: { forecast: Section[] }) {
+  if (!forecast || forecast.length === 0) return null;
+
+  const dailyPoints: { dateLabel: string; score: number }[] = [];
+
+  forecast.forEach((sec) => {
+    sec.items.forEach((item) => {
+      let good = 0;
+      let warn = 0;
+
+      if (item.tone === "ดี") good += 2;
+      else if (item.tone === "ร้าย") warn += 2;
+      else if (item.tone === "ผสม") {
+        good += 1;
+        warn += 1;
+      }
+
+      item.sub?.forEach((t) => {
+        if (t.includes("ดี:") || t.includes("ส่งแรงหนุน") || t.includes("[ดี]") || t.includes("มุมให้คุณ")) {
+          good++;
+        }
+        if (t.includes("ระวัง:") || t.includes("ส่งแรงกด") || t.includes("[ร้าย]") || t.includes("มุมให้โทษ")) {
+          warn++;
+        }
+      });
+
+      const rawDate = item.head ? item.head.split("·")[0].trim() : sec.title;
+      const score = Math.max(20, Math.min(90, 50 + (good * 8) - (warn * 8)));
+      dailyPoints.push({ dateLabel: rawDate, score });
+    });
+  });
+
+  if (dailyPoints.length === 0) return null;
+
+  const width = Math.max(650, dailyPoints.length * 55);
+  const height = 200;
+  const padding = 40;
+
+  const pointsData = dailyPoints.map((pt, idx) => {
+    const x = padding + (idx * (width - padding * 2)) / Math.max(1, dailyPoints.length - 1);
+    const y = height - padding - (pt.score / 100) * (height - padding * 2);
+    return { ...pt, x, y };
+  });
+
+  const pathD = pointsData.reduce(
+    (acc, pt, i) => (i === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`),
+    ""
+  );
+
+  return (
+    <section className={card}>
+      <h2 className="mb-1 text-lg font-bold">📈 กราฟชีวิตรายวัน (Daily Life Graph)</h2>
+      <p className="mb-3 text-xs text-neutral-500">
+        เกณฑ์คะแนนขึ้นลงตามแรงหนุนดาวจร (คะแนนสูง = จังหวะดวงดี / คะแนนต่ำ = จังหวะต้องระวัง)
+      </p>
+
+      <div className="w-full overflow-x-auto pb-2">
+        <svg viewBox={`0 0 ${width} ${height}`} style={{ width: `${width}px`, height: `${height}px` }}>
+          <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="#e5e5e5" strokeWidth="1" strokeDasharray="4" />
+          <path d={pathD} fill="none" stroke="#8a6d3b" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          {pointsData.map((pt, i) => (
+            <g key={i}>
+              <line x1={pt.x} y1={pt.y} x2={pt.x} y2={height - 25} stroke="#f0f0f0" strokeWidth="1" />
+              <circle cx={pt.x} cy={pt.y} r="4.5" fill={pt.score >= 50 ? "#059669" : "#dc2626"} stroke="#ffffff" strokeWidth="1.5" />
+              <text x={pt.x} y={pt.y - 8} textAnchor="middle" className="text-[10px] font-bold fill-neutral-700 dark:fill-neutral-300">
+                {pt.score}
+              </text>
+              <text x={pt.x} y={height - 8} textAnchor="middle" className="text-[9px] fill-neutral-500 font-medium">
+                {pt.dateLabel.length > 12 ? pt.dateLabel.slice(0, 10) + "..." : pt.dateLabel}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    </section>
+  );
+}
+
+// -------------------------------------------------------------
+// Component การ์ด 3 กล่อง (พับ/ยุบเก็บไว้เป็นค่าเริ่มต้นเสมอ ไม่มี open)
+// -------------------------------------------------------------
+function ItemCardView({ item }: { item: Item }) {
+  const goodList: string[] = [];
+  const warnList: string[] = [];
+  const mixList: string[] = [];
 
   if (item.sub && item.sub.length > 0) {
     for (const rawText of item.sub) {
       const t = rawText.trim().replace(/^[•\-\*\s]+/, "");
-      if (t.includes("มุมให้คุณ:")) {
-        const parts = t.split("มุมให้คุณ:");
-        if (parts[1]) parts[1].split("·").forEach((s) => s.trim() && goodList.push(simplifyText(s)));
-      } else if (t.includes("มุมให้โทษ:")) {
-        const parts = t.split("มุมให้โทษ:");
-        if (parts[1]) parts[1].split("·").forEach((s) => s.trim() && warnList.push(simplifyText(s)));
-      } else if (t.startsWith("เหตุการณ์ในเดือนนี้") || t.match(/^\d+\s+[ก-ฮ]+/)) {
-        eventsList.push(t);
-      } else {
-        const m = t.match(/^\[(ดี|ร้าย|ผสม)\]\s*(.*)$/);
-        if (m) {
-          const clean = simplifyText(m[2]);
-          if (m[1] === "ดี") goodList.push(clean);
-          else if (m[1] === "ร้าย") warnList.push(clean);
-          else mixList.push(clean);
-        } else if (t.includes("คำนวณจากตำแหน่งดาว") || t.includes("มุมให้คุณ") || t.includes("ให้คุณมาก")) {
-          goodList.push(simplifyText(t));
-        } else if (t.includes("มุมให้โทษ") || t.includes("ระวัง") || t.includes("ให้โทษ")) {
-          warnList.push(simplifyText(t));
-        } else {
-          mixList.push(simplifyText(t));
-        }
+
+      if (t.startsWith("ดี:")) {
+        goodList.push(simplifyText(t.replace(/^ดี:\s*/, "")));
+      } else if (t.startsWith("ระวัง:")) {
+        warnList.push(simplifyText(t.replace(/^ระวัง:\s*/, "")));
+      } else if (t.startsWith("กลาง:") || t.startsWith("ผสม:")) {
+        mixList.push(simplifyText(t.replace(/^(กลาง|ผสม):\s*/, "")));
+      } else if (t.includes("มุมให้คุณ") || t.includes("ส่งแรงหนุน") || t.startsWith("[ดี]")) {
+        goodList.push(simplifyText(t.replace(/^\[ดี\]\s*/, "")));
+      } else if (t.includes("มุมให้โทษ") || t.includes("ส่งแรงกด") || t.includes("ระวัง") || t.startsWith("[ร้าย]")) {
+        warnList.push(simplifyText(t.replace(/^\[ร้าย\]\s*/, "")));
+      } else if (t.startsWith("[ผสม]")) {
+        mixList.push(simplifyText(t.replace(/^\[ผสม\]\s*/, "")));
+      } else if (t.length > 0) {
+        if (item.tone === "ดี") goodList.push(simplifyText(t));
+        else if (item.tone === "ร้าย") warnList.push(simplifyText(t));
+        else mixList.push(simplifyText(t));
       }
     }
   }
 
   return (
-    <details className="group rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+    <details className="group rounded-xl border border-neutral-200 bg-white p-3.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <summary className="flex w-full cursor-pointer items-center justify-between font-bold text-neutral-900 list-none dark:text-neutral-100">
         <div>
           {item.head && (
-            <div className="text-lg font-bold">
+            <div className="text-base font-bold">
               {item.head}
               <ToneBadge tone={item.tone} />
             </div>
           )}
-          {/* ปรับปรุงคำบรรยายสรุปใต้วันที่ให้เป็นภาษาคนตรงนี้ */}
           {item.text && (
-            <p className="mt-0.5 text-sm font-medium text-neutral-600 dark:text-neutral-400">
+            <p className="mt-0.5 text-xs font-medium text-neutral-600 dark:text-neutral-400">
               {simplifyHeader(item.text)}
             </p>
           )}
         </div>
-        <span className="ml-2 text-xl text-neutral-400 select-none">
+        <span className="ml-2 text-lg text-neutral-400 select-none">
           <span className="inline group-open:hidden">▼</span>
           <span className="hidden group-open:inline">▲</span>
         </span>
       </summary>
 
-      <div className="mt-4 flex flex-col gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {/* ดี */}
-          <div className="flex flex-col rounded-lg border-2 border-emerald-300 bg-emerald-50/60 p-3 dark:border-emerald-800 dark:bg-emerald-950/30">
-            <div className="mb-2">
-              <span className="inline-block rounded bg-emerald-600 px-2.5 py-0.5 text-xs font-bold text-white dark:bg-emerald-500">
-                ดี (เรื่องที่เด่น)
-              </span>
-            </div>
-            {goodList.length > 0 ? (
-              <ul className="space-y-1.5 text-sm text-emerald-950 dark:text-emerald-100 font-medium">
-                {goodList.map((line, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="select-none">•</span>
-                    <span>{line}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="py-1 text-sm font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
-            )}
+      <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+        <div className="flex flex-col rounded-lg border-2 border-emerald-300 bg-emerald-50/60 p-2.5 dark:border-emerald-800 dark:bg-emerald-950/30">
+          <div className="mb-1.5">
+            <span className="inline-block rounded bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white dark:bg-emerald-500">
+              ดี (เรื่องที่เด่น)
+            </span>
           </div>
+          {goodList.length > 0 ? (
+            <ul className="space-y-1 text-xs text-emerald-950 dark:text-emerald-100 font-medium">
+              {goodList.map((line, idx) => (
+                <li key={idx} className="flex items-start gap-1.5">
+                  <span className="select-none">•</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="py-0.5 text-xs font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
+          )}
+        </div>
 
-          {/* ผสม / กลาง */}
-          <div className="flex flex-col rounded-lg border-2 border-amber-300 bg-amber-50/60 p-3 dark:border-amber-800 dark:bg-amber-950/30">
-            <div className="mb-2">
-              <span className="inline-block rounded bg-amber-500 px-2.5 py-0.5 text-xs font-bold text-white dark:bg-amber-600">
-                ผสม / กลาง (ต้องรอบคอบ)
-              </span>
-            </div>
-            {mixList.length > 0 ? (
-              <ul className="space-y-1.5 text-sm text-amber-950 dark:text-amber-100 font-medium">
-                {mixList.map((line, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="select-none">•</span>
-                    <span>{line}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="py-1 text-sm font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
-            )}
+        <div className="flex flex-col rounded-lg border-2 border-amber-300 bg-amber-50/60 p-2.5 dark:border-amber-800 dark:bg-amber-950/30">
+          <div className="mb-1.5">
+            <span className="inline-block rounded bg-amber-500 px-2 py-0.5 text-[11px] font-bold text-white dark:bg-amber-600">
+              ผสม / กลาง (ต้องรอบคอบ)
+            </span>
           </div>
+          {mixList.length > 0 ? (
+            <ul className="space-y-1 text-xs text-amber-950 dark:text-amber-100 font-medium">
+              {mixList.map((line, idx) => (
+                <li key={idx} className="flex items-start gap-1.5">
+                  <span className="select-none">•</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="py-0.5 text-xs font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
+          )}
+        </div>
 
-          {/* ระวัง */}
-          <div className="flex flex-col rounded-lg border-2 border-red-300 bg-red-50/60 p-3 dark:border-red-800 dark:bg-red-950/30">
-            <div className="mb-2">
-              <span className="inline-block rounded bg-red-600 px-2.5 py-0.5 text-xs font-bold text-white dark:bg-red-500">
-                ระวัง (สิ่งที่ควรเลี่ยง)
-              </span>
-            </div>
-            {warnList.length > 0 ? (
-              <ul className="space-y-1.5 text-sm text-red-950 dark:text-red-100 font-medium">
-                {warnList.map((line, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <span className="select-none">•</span>
-                    <span>{line}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <div className="py-1 text-sm font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
-            )}
+        <div className="flex flex-col rounded-lg border-2 border-red-300 bg-red-50/60 p-2.5 dark:border-red-800 dark:bg-red-950/30">
+          <div className="mb-1.5">
+            <span className="inline-block rounded bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white dark:bg-red-500">
+              ระวัง (สิ่งที่ควรเลี่ยง)
+            </span>
           </div>
+          {warnList.length > 0 ? (
+            <ul className="space-y-1 text-xs text-red-950 dark:text-red-100 font-medium">
+              {warnList.map((line, idx) => (
+                <li key={idx} className="flex items-start gap-1.5">
+                  <span className="select-none">•</span>
+                  <span>{line}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="py-0.5 text-xs font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
+          )}
         </div>
       </div>
     </details>
   );
 }
 
-// -------------------------------------------------------------
-// 3. การ์ดรายละเอียดทางโหราศาสตร์ (เริ่มต้นพับไว้ ยุบทุกช่อง)
-// -------------------------------------------------------------
 function DetailCardView({ item }: { item: Item }) {
   return (
-    <details className="group rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+    <details className="group rounded-xl border border-neutral-200 bg-white p-3.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <summary className="flex w-full cursor-pointer items-center justify-between font-bold text-neutral-900 list-none dark:text-neutral-100">
         <div>
           {item.head && (
-            <div className="text-lg font-bold">
+            <div className="text-base font-bold">
               {item.head}
               <ToneBadge tone={item.tone} />
             </div>
           )}
-          {item.text && <p className="mt-0.5 text-sm font-medium text-neutral-600 dark:text-neutral-400">{item.text}</p>}
+          {item.text && <p className="mt-0.5 text-xs font-medium text-neutral-600 dark:text-neutral-400">{item.text}</p>}
         </div>
-        <span className="ml-2 text-xl text-neutral-400 select-none">
+        <span className="ml-2 text-lg text-neutral-400 select-none">
           <span className="inline group-open:hidden">▼</span>
           <span className="hidden group-open:inline">▲</span>
         </span>
       </summary>
 
       {item.sub && item.sub.length > 0 && (
-        <div className="mt-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
-          <ul className="space-y-1 text-sm text-neutral-700 dark:text-neutral-300">
+        <div className="mt-2.5 border-t border-neutral-100 pt-2.5 dark:border-neutral-800">
+          <ul className="space-y-1 text-xs text-neutral-700 dark:text-neutral-300">
             {item.sub.map((t, idx) => (
-              <li key={idx} className="flex items-start gap-2">
+              <li key={idx} className="flex items-start gap-1.5">
                 <span className="select-none text-neutral-400">•</span>
-                <span>{t}</span>
+                <span>{simplifyText(t)}</span>
               </li>
             ))}
           </ul>
@@ -436,10 +353,79 @@ function DetailCardView({ item }: { item: Item }) {
   );
 }
 
+// -------------------------------------------------------------
+// ตรรกะแยกและรวบกลุ่มข้อมูลเป็น [ปี ➔ เดือน ➔ รายการไอเทม]
+// -------------------------------------------------------------
+type GroupedYear = {
+  yearBE: string;
+  months: {
+    monthName: string;
+    items: Item[];
+  }[];
+};
+
+function processNestedForecast(forecast: Section[]): GroupedYear[] {
+  const yearMap = new Map<string, Map<string, Item[]>>();
+
+  forecast.forEach((sec) => {
+    sec.items.forEach((item) => {
+      // ดึงปี พ.ศ. จาก item.head หรือ sec.title
+      let yearBE = "";
+      const yMatch = (item.head || "").match(/พ\.ศ\.\s*(\d+)/) || sec.title.match(/พ\.ศ\.\s*(\d+)/);
+      if (yMatch) {
+        yearBE = `พ.ศ. ${yMatch[1]}`;
+      } else {
+        const numMatch = (item.head || "").match(/(\d{4})/);
+        yearBE = numMatch ? `พ.ศ. ${numMatch[1]}` : "คำทำนายประจำปี";
+      }
+
+      // ดึงเดือน
+      let monthName = "";
+      for (const m of THAI_MONTHS) {
+        if ((item.head || "").includes(m) || sec.title.includes(m)) {
+          monthName = `เดือน ${m}`;
+          break;
+        }
+      }
+      if (!monthName) monthName = sec.title || "คำทำนายประจำเดือน";
+
+      if (!yearMap.has(yearBE)) {
+        yearMap.set(yearBE, new Map());
+      }
+      const mContainer = yearMap.get(yearBE)!;
+
+      if (!mContainer.has(monthName)) {
+        mContainer.set(monthName, []);
+      }
+      mContainer.get(monthName)!.push(item);
+    });
+  });
+
+  const structuredList: GroupedYear[] = [];
+  yearMap.forEach((mMap, yearBE) => {
+    const monthList: { monthName: string; items: Item[] }[] = [];
+    mMap.forEach((items, monthName) => {
+      monthList.push({ monthName, items });
+    });
+    structuredList.push({ yearBE, months: monthList });
+  });
+
+  return structuredList;
+}
+
 export default async function PredictPage({ searchParams }: Props) {
   const sp = await searchParams;
   const hasTime = sp.nt !== "1";
   const gender: Gender = sp.sex === "m" ? "m" : sp.sex === "f" ? "f" : undefined;
+
+  const currentDate = new Date();
+  const currentYearBE = currentDate.getFullYear() + 543;
+  const currentMonthNum = currentDate.getMonth() + 1;
+
+  const selectedMonth = sp.month ? Number(sp.month) : currentMonthNum;
+  const selectedYearBE = sp.year ? Number(sp.year) : currentYearBE;
+
+  const yearOptions = Array.from({ length: 8 }, (_, i) => currentYearBE - 2 + i);
 
   let natal: ChartResult | null = null;
   let now: ChartResult | null = null;
@@ -450,7 +436,13 @@ export default async function PredictPage({ searchParams }: Props) {
 
   if (sp.date) {
     const birth = parseInput({ date: sp.date, time: hasTime ? sp.time || "12:00" : "12:00", place: sp.place });
-    const today = parseInput({ place: sp.place });
+
+    const selectedYearAD = selectedYearBE - 543;
+    const padMonth = String(selectedMonth).padStart(2, "0");
+    const targetDateStr = `${selectedYearAD}-${padMonth}-01`;
+
+    const today = parseInput({ date: targetDateStr, place: sp.place });
+
     if (!birth || !today) {
       error = "ข้อมูลไม่ถูกต้อง (วันที่ YYYY-MM-DD, เวลา HH:MM)";
     } else {
@@ -465,6 +457,9 @@ export default async function PredictPage({ searchParams }: Props) {
       }
     }
   }
+
+  // รวบจัดกลุ่มตาม [ปี ➔ เดือน ➔ การ์ดคำทำนาย]
+  const nestedForecastData = processNestedForecast(forecast);
 
   return (
     <main className="mx-auto max-w-3xl p-4 pb-12">
@@ -509,6 +504,29 @@ export default async function PredictPage({ searchParams }: Props) {
             </option>
           </select>
         </label>
+
+        <label className="flex flex-col gap-0.5 text-sm text-neutral-500">
+          ดูทำนายประจำเดือน
+          <select name="month" defaultValue={selectedMonth} className={inputCls}>
+            {THAI_MONTHS.map((mName, idx) => (
+              <option key={idx + 1} value={idx + 1} className="text-black">
+                {mName}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-0.5 text-sm text-neutral-500">
+          ดูทำนายประจำปี
+          <select name="year" defaultValue={selectedYearBE} className={inputCls}>
+            {yearOptions.map((yBE) => (
+              <option key={yBE} value={yBE} className="text-black">
+                พ.ศ. {yBE}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <label className="flex flex-col gap-0.5 text-sm text-neutral-500">
           พยากรณ์ล่วงหน้า
           <select name="range" defaultValue={range} className={inputCls}>
@@ -537,28 +555,69 @@ export default async function PredictPage({ searchParams }: Props) {
             {hasTime ? ` เวลา ${natal.datetime_th.split(" ")[1].slice(0, 5)} น.` : " (ไม่ทราบเวลา)"} · {natal.location.name}
           </p>
 
-          {/* 1. สรุปภาพรวมดวงชะตา */}
-          <section className={card}>
-            <h2 className="mb-3 text-lg font-bold">สรุปภาพรวมดวงชะตา</h2>
-            <div className="flex flex-col gap-3">
+          {/* 1. สรุปภาพรวมดวงชะตา (พับเก็บไว้เป็นค่าเริ่มต้น) */}
+          <details className="group rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <summary className="flex w-full cursor-pointer items-center justify-between text-lg font-bold text-neutral-900 list-none dark:text-neutral-100">
+              <span>📌 สรุปภาพรวมดวงชะตา (วันนี้ / เดือนนี้ / ปีนี้)</span>
+              <span className="ml-2 text-xl text-neutral-400 select-none">
+                <span className="inline group-open:hidden">▼</span>
+                <span className="hidden group-open:inline">▲</span>
+              </span>
+            </summary>
+            <div className="mt-3 flex flex-col gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
               {reading.summary.map((it, i) => (
-                <SummaryCardView key={`sum-${i}`} item={it} />
+                <ItemCardView key={`sum-${i}`} item={it} />
               ))}
             </div>
-          </section>
+          </details>
 
-          {/* 2. อนาคตใกล้: แนวโน้มรายเดือน */}
-          {forecast.map((sec) => (
-            <section key={sec.id} className={card}>
-              <h2 className="text-lg font-bold">{sec.title}</h2>
-              {sec.note && <p className="mb-2 text-xs text-neutral-500">{sec.note}</p>}
-              <div className="mt-3 flex flex-col gap-3">
-                {sec.items.map((it, i) => (
-                  <ForecastCardView key={`${sec.id}-${i}`} item={it} />
-                ))}
-              </div>
-            </section>
-          ))}
+          {/* 2. กราฟชีวิตรายวัน (Daily Life Graph) */}
+          <DailyLifeChart forecast={forecast} />
+
+          {/* 3. อนาคตใกล้: ปฏิทินดาวจร (ซ้อนกล่องพับ 2 ชั้นอย่างสมบูรณ์) */}
+          <div className="flex flex-col gap-3">
+            <h2 className="text-lg font-bold">🌙 อนาคตใกล้: ปฏิทินดาวจร</h2>
+            {nestedForecastData.map((yGroup, yIdx) => (
+              // กล่องระดับ 1: รวบกลุ่มปี พ.ศ. (พับเก็บไว้เป็นค่าเริ่มต้น)
+              <details
+                key={`year-${yIdx}`}
+                className="group rounded-xl border-2 border-neutral-300 bg-neutral-50/70 p-4 shadow-sm dark:border-neutral-700 dark:bg-neutral-900/50"
+              >
+                <summary className="flex w-full cursor-pointer items-center justify-between text-lg font-bold text-neutral-900 list-none dark:text-neutral-100">
+                  <span>🗓️ คำทำนายประจำ {yGroup.yearBE}</span>
+                  <span className="ml-2 text-xl text-neutral-500 select-none">
+                    <span className="inline group-open:hidden">▼</span>
+                    <span className="hidden group-open:inline">▲</span>
+                  </span>
+                </summary>
+
+                <div className="mt-3 flex flex-col gap-3 border-t border-neutral-200 pt-3 dark:border-neutral-800">
+                  {yGroup.months.map((mGroup, mIdx) => (
+                    // กล่องระดับ 2: รวบกลุ่มเดือน (พับเก็บไว้เป็นค่าเริ่มต้น)
+                    <details
+                      key={`month-${mIdx}`}
+                      className="group/month rounded-xl border border-neutral-200 bg-white p-3.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900"
+                    >
+                      <summary className="flex w-full cursor-pointer items-center justify-between text-base font-bold text-neutral-800 list-none dark:text-neutral-200">
+                        <span>📅 {mGroup.monthName}</span>
+                        <span className="ml-2 text-lg text-neutral-400 select-none">
+                          <span className="inline group-open/month:hidden">▼</span>
+                          <span className="hidden group-open/month:inline">▲</span>
+                        </span>
+                      </summary>
+
+                      {/* การ์ดคำทำนายรายวันทั้งหมดจะถูกพับเก็บไว้ข้างในเดือน */}
+                      <div className="mt-3 flex flex-col gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+                        {mGroup.items.map((itemObj, itemIdx) => (
+                          <ItemCardView key={`item-${yIdx}-${mIdx}-${itemIdx}`} item={itemObj} />
+                        ))}
+                      </div>
+                    </details>
+                  ))}
+                </div>
+              </details>
+            ))}
+          </div>
 
           {hasTime && (
             <div className="rounded-xl border border-neutral-200 p-2 dark:border-neutral-800">
@@ -566,18 +625,29 @@ export default async function PredictPage({ searchParams }: Props) {
             </div>
           )}
 
-          {/* 3. รายละเอียดทางโหราศาสตร์ */}
-          {reading.sections.map((sec) => (
-            <section key={sec.id} className={card}>
-              <h2 className="text-lg font-bold">{sec.title}</h2>
-              {sec.note && <p className="mb-2 text-xs text-neutral-500">{sec.note}</p>}
-              <div className="mt-3 flex flex-col gap-3">
-                {sec.items.map((it, i) => (
-                  <DetailCardView key={`${sec.id}-${i}`} item={it} />
-                ))}
-              </div>
-            </section>
-          ))}
+          {/* 4. รายละเอียดทางโหราศาสตร์เพิ่มเติม (พับเก็บไว้เป็นค่าเริ่มต้น) */}
+          <details className="group rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+            <summary className="flex w-full cursor-pointer items-center justify-between text-lg font-bold text-neutral-900 list-none dark:text-neutral-100">
+              <span>📜 รายละเอียดวิเคราะห์โหราศาสตร์พลูหลวง</span>
+              <span className="ml-2 text-xl text-neutral-400 select-none">
+                <span className="inline group-open:hidden">▼</span>
+                <span className="hidden group-open:inline">▲</span>
+              </span>
+            </summary>
+
+            <div className="mt-3 flex flex-col gap-4 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+              {reading.sections.map((sec) => (
+                <div key={sec.id} className={card}>
+                  <h3 className="text-base font-bold mb-2">{sec.title}</h3>
+                  <div className="flex flex-col gap-2.5">
+                    {sec.items.map((it, i) => (
+                      <DetailCardView key={`${sec.id}-${i}`} item={it} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
 
           <p className="text-xs text-neutral-500">
             แปลผลตามกฎโหราศาสตร์ระบบพลูหลวงแบบกว้าง ๆ ใช้ประกอบการพิจารณาเท่านั้น ไม่ใช่การยืนยันเหตุการณ์
