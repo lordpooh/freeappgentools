@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import ThaiWheel from "../../components/ThaiWheel";
 import { computeChart } from "../../lib/ephemeris";
 import {
@@ -42,7 +43,7 @@ export default async function AstroPage({ searchParams }: Props) {
         <p className="mt-4 text-red-600">
           ข้อมูลไม่ถูกต้อง (วันที่ YYYY-MM-DD, เวลา HH:MM, ละติจูดไม่เกิน ±66, ลองจิจูดไม่เกิน ±180)
         </p>
-        <a className="underline" href="/astro">กลับ</a>
+        <Link className="underline" href="/astro">กลับ</Link>
       </main>
     );
   }
@@ -55,7 +56,7 @@ export default async function AstroPage({ searchParams }: Props) {
       <main className="mx-auto max-w-3xl p-4">
         <h1 className="text-xl font-bold">ผังดวงชะตาไทย</h1>
         <p className="mt-4 text-red-600">คำนวณไม่ได้ ตรวจสอบวันที่และเวลาอีกครั้ง (เช่น วันที่ต้องมีอยู่จริงในปฏิทิน)</p>
-        <a className="underline" href="/astro">กลับ</a>
+        <Link className="underline" href="/astro">กลับ</Link>
       </main>
     );
   }
@@ -76,9 +77,9 @@ export default async function AstroPage({ searchParams }: Props) {
     <main className="mx-auto max-w-5xl p-4 pb-12">
       <h1 className="mb-1 text-xl font-bold">ผังดวงชะตาไทย</h1>
       <p className="mb-3 text-sm">
-        <a className="underline" href="/astro/predict">
+        <Link className="underline" href="/astro/predict">
           คำทำนายจากวันเกิด →
-        </a>
+        </Link>
       </p>
 
       <form method="get" action="/astro" className="mb-2 flex flex-wrap items-end gap-2">
@@ -138,9 +139,9 @@ export default async function AstroPage({ searchParams }: Props) {
         <button type="submit" className="rounded-lg bg-[#8a6d3b] px-4 py-2 text-white hover:bg-[#75592c]">
           แสดงดวง
         </button>
-        <a className="px-1 py-2 text-sm underline" href="/astro">
+        <Link className="px-1 py-2 text-sm underline" href="/astro">
           ใช้เวลาปัจจุบัน
-        </a>
+        </Link>
       </form>
       <p className="mb-4 text-xs text-neutral-500">
         ติ๊ก &quot;ตามปฏิทิน&quot; เพื่อให้ตรงกับหน้าปฏิทินโหราศาสตร์ที่แสดงสมผุส ณ เวลา 24:00น. ของวันที่เลือก (ไม่ใช้ช่องเวลา)
@@ -227,9 +228,9 @@ export default async function AstroPage({ searchParams }: Props) {
         ลัคนาคำนวณจากอาทิตย์ขึ้นตามสถานที่ที่เลือก ยังไม่ได้ตรวจสอบกับดวงก่อน พ.ศ. 2463
       </p>
       <p className="mt-2 text-xs text-neutral-500">
-        <a className="underline" href="./" rel="noopener noreferrer">
+        <Link className="underline" href="/">
           กลับหน้าแรก
-        </a>
+        </Link>
       </p>
     </main>
   );

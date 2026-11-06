@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import ThaiWheel from "../../../components/ThaiWheel";
 import { computeChart, computeTimeline } from "../../../lib/ephemeris";
 import { buildForecast, buildReading, type Gender, type Item, type Reading, type Section, type Tone } from "../../../lib/predict";
@@ -116,14 +117,14 @@ export default async function PredictPage({ searchParams }: Props) {
       <h1 className="mb-1 text-xl font-bold">คำทำนายจากวันเกิด</h1>
       <p className="mb-3 text-sm text-neutral-500">
         ระบบโหราศาสตร์พลูหลวง (เกษตรเรือนเดี่ยว) เทียบดวงกำเนิดกับดาวจร ณ ปัจจุบัน ·{" "}
-        <a className="underline" href="/astro">
+        <Link className="underline" href="/astro">
           กลับหน้าผังดวง
-        </a>
+        </Link>
       </p>
-      <p className="mb-3 text-sm text-neutral-500">
-        <a className="underline" href="/">
+      <p className="mb-3 text-sm">
+        <Link className="underline" href="/astro">
           กลับหน้าแรก →
-        </a>
+        </Link>
       </p>
 
       <form method="get" action="/astro/predict" className="mb-4 flex flex-wrap items-end gap-2">
