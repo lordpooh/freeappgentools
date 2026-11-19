@@ -63,8 +63,8 @@ export const HOUSES = [
 /** มารดา/บิดาในภพ ๔ และ ๙ ขึ้นกับเพศเจ้าชะตา */
 function houseTheme(h: number, g: Gender) {
   const base = HOUSES[h - 1].theme;
-  if (h === 4) return base + (g === "m" ? " มารดา" : g === "f" ? " บิดา" : " มารดา(ดวงชาย) บิดา(ดวงหญิง)");
-  if (h === 9) return base + (g === "m" ? " บิดา" : g === "f" ? " มารดา" : " บิดา(ดวงชาย) มารดา(ดวงหญิง)");
+  if (h === 4) return base + (g === "m" ? " มารดา" : g === "f" ? " บิดา" : " พ่อแม่");
+  if (h === 9) return base + (g === "m" ? " บิดา" : g === "f" ? " มารดา" : " พ่อแม่");
   return base;
 }
 
@@ -306,9 +306,8 @@ export function buildReading(natal: ChartResult, now: ChartResult, hasTime: bool
   // ---------- ๑. ลัคนาและดาวเจ้าเรือนลัคน์ ----------
   if (hasTime) {
     const el = LOCAL_ELEMENT[lagna % 4];
-    const sex = el === "ไฟ" || el === "ดิน" ? "ชาย" : "หญิง";
     const items: Item[] = [
-      { head: `ลัคนาราศี${signName(lagna)}`, text: `ราศีธาตุ${el} เพศ${sex}` },
+      { head: `ลัคนาราศี${signName(lagna)}`, text: `ราศีธาตุ${el}` },
     ];
     for (const lc of lagnaLords) {
       if (lc === "B") {

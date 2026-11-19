@@ -3,6 +3,8 @@ import Link from "next/link";
 import ThaiWheel from "../../../components/ThaiWheel";
 import { computeChart, computeTimeline } from "../../../lib/ephemeris";
 import { buildForecast, buildReading, type Gender, type Item, type Reading, type Section, type Tone } from "../../../lib/predict";
+import PredictExport, { type ExportCard, type ExportSection } from "../../../components/PredictExport";
+import { bucketize, plainHeader, plainLine, type Bucket } from "../../../lib/house-voice";
 import { PLACES, parseInput, type ChartResult } from "../../../lib/thai-astro";
 
 export const metadata: Metadata = {
@@ -56,74 +58,11 @@ function ToneBadge({ tone }: { tone?: Tone }) {
   return <span className={`ml-2 rounded px-1.5 py-0.5 text-xs font-semibold ${TONE_CLS[tone]}`}>{tone}</span>;
 }
 
-// -------------------------------------------------------------
-// ฟังก์ชันสรุปภาษาคน (12 ดาว)
-// -------------------------------------------------------------
-function simplifyText(text: string): string {
-  let t = text.trim().replace(/^[•\-\*\s]+/, "");
-
-  if (t.includes("อาทิตย์")) {
-    t = t.replace(/อาทิตย์จร/g, "เรื่องเกียรติยศ ผลงาน หรือผู้ใหญ่/หัวหน้า");
-  } else if (t.includes("จันทร์")) {
-    t = t.replace(/จันทร์จร/g, "เรื่องอารมณ์ ความรู้สึก การเดินทาง หรือผู้หญิง/คู่ครอง");
-  } else if (t.includes("อังคาร")) {
-    t = t.replace(/อังคารจร/g, "เรื่องการลุยงาน ความขยัน (ระวังใจร้อน ทะเลาะ หรืออุบัติเหตุ)");
-  } else if (t.includes("พุธ")) {
-    t = t.replace(/พุธจร/g, "เรื่องการเจรจา สื่อสาร เอกสารสัญญา การพูดคุย การประพันธ์ ปรับตัวง่าย");
-  } else if (t.includes("พฤหัสบดี")) {
-    t = t.replace(/พฤหัสบดีจร/g, "เรื่องผู้ใหญ่สนับสนุน โอกาสดีๆ การเรียนรู้ โชคลาภ ปัญญา");
-  } else if (t.includes("ศุกร์")) {
-    t = t.replace(/ศุกร์จร/g, "เรื่องความรัก ความสุข การเงิน โชคลาภ การใช้จ่าย ศิลปะ คู่ครอง การแต่งงาน");
-  } else if (t.includes("เสาร์")) {
-    t = t.replace(/เสาร์จร/g, "เรื่องภาระงานหนัก ความกดดัน อุปสรรค หรือความเหน็ดเหนื่อย");
-  } else if (t.includes("ราหู")) {
-    t = t.replace(/ราหูจร/g, "ระวังความลุ่มหลง การถูกหลอก เอกสารหลุมพราง ต่างชาติต่างภาษา");
-  } else if (t.includes("เกตุ")) {
-    t = t.replace(/เกตุจร/g, "เรื่องเก่าๆ ที่ย้อนกลับมา เรื่องลี้ลับ สิ่งศักดิ์สิทธิ์");
-  } else if (t.includes("มฤตยู")) {
-    t = t.replace(/มฤตยูจร/g, "เรื่องไม่คาดฝัน การเปลี่ยนแปลงกะทันหัน หรือไอเดียใหม่ๆ การคิดค้นสิ่งใหม่ การเดินทาง  ต่างแดน");
-  } else if (t.includes("เนปจูน")) {
-    t = t.replace(/เนปจูนจร/g, "เรื่องความคลุมเครือ สื่อสังคมออนไลน์ หรือระวังการถูกปิดบัง การสังคม ฝูงชน การโฆษณา ไสยศาสตร์ เรื่องเร้นลับ การปิดบัง");
-  } else if (t.includes("พลูโต")) {
-    t = t.replace(/พลูโตจร/g, "แรงกดดันลึกๆ การสูญเสีย/พลัดพราก หรือการปรับปรุงชีวิตใหม่ ความเงียบขรึม การสะสม โหราศาสตร์ วิญญาณ");
-  }
-
-  t = t.replace(/ตรีโกณ|จตุโกณ \(กากบาท\)|ศูนยพาหะ|ปลายหอก|กุม\/ทับ|ตามหลัง \(ก้ามปู\)|โยคหน้า|โยคหลัง|เล็ง/g, "");
-  t = t.replace(/ศุภเคราะห์|บาปเคราะห์/g, "");
-  t = t.replace(/ดาวเจ้าเรือนลัคน์\s*\([^)]*\)/g, "ตัวเอง");
-  t = t.replace(/ลัคนา/g, "ตัวเอง");
-  t = t.replace(/จันทร์กำเนิด|อาทิตย์กำเนิด/g, "");
-  t = t.replace(/:\s*:/g, ":");
-  t = t.replace(/\s+/g, " ").trim();
-
-  return t;
-}
-
-function simplifyHeader(text: string): string {
-  let t = text;
-  t = t.replace(/ตรงกับภพ\s*\d+\s*กัมมะ:?[^·]*/g, "เน้นเรื่อง: การงาน อาชีพ การเรียน และการลงมือทำ");
-  t = t.replace(/ตรงกับภพ\s*\d+\s*กฎุมพะ:?[^·]*/g, "เน้นเรื่อง: การเงิน รายได้ และการเจรจาค้าขาย");
-  t = t.replace(/ตรงกับภพ\s*\d+\s*สหัชชะ:?[^·]*/g, "เน้นเรื่อง: การเดินทาง เพื่อนฝูง และการสังคม");
-  t = t.replace(/ตรงกับภพ\s*\d+\s*พันธุ:?[^·]*/g, "เน้นเรื่อง: บ้าน ครอบครัว และอสังหาริมทรัพย์");
-  t = t.replace(/ตรงกับภพ\s*\d+\s*ปุตตะ:?[^·]*/g, "เน้นเรื่อง: ลูก บริวาร โครงการใหม่ๆ");
-  t = t.replace(/ตรงกับภพ\s*\d+\s*อริ:?[^·]*/g, "เน้นเรื่อง: ปัญหา อุปสรรค และสุขภาพที่ต้องแก้ไข");
-  t = t.replace(/ตรงกับภพ\s*\d+\s*ปัตนิ:?[^·]*/g, "เน้นเรื่อง: ความรัก คู่ครอง และหุ้นส่วน");
-  t = t.replace(/ตรงกับภพ\s*\d+\s*มรณะ:?[^·]*/g, "เน้นเรื่อง: การเปลี่ยนแปลงกะทันหัน หรือการจบเรื่องเก่า");
-  t = t.replace(/ตรงกับภพ\s*\d+\s*ศุภะ:?[^·]*/g, "เน้นเรื่อง: โชคลาภ ผู้ใหญ่สนับสนุน การเดินทางไกล");
-  t = t.replace(/ตรงกับภพ\s*\d+\s*ลาภะ:?[^·]*/g, "เน้นเรื่อง: ลาภผล ความสำเร็จ และผู้เกื้อกูล");
-  t = t.replace(/ตรงกับภพ\s*\d+\s*วินาศนะ:?[^·]*/g, "เน้นเรื่อง: เรื่องเบื้องหลัง ค่าใช้จ่ายไม่คาดคิด");
-
-  t = t.replace(/ดาวจรเร็ว\s*ผลระยะสั้น\s*\(วันที่คลาดได้\s*±1\s*วัน\)/g, "(ส่งผลไว ช่วง 1-2 วันนี้)");
-  t = t.replace(/ดาวจรช้า\s*ผลระยะยาว[^·]*/g, "(ส่งผลยาวนาน)");
-  return t;
-}
 
 // -------------------------------------------------------------
 // Component กราฟชีวิตรายวัน (Daily Life Graph)
 // -------------------------------------------------------------
-function DailyLifeChart({ forecast }: { forecast: Section[] }) {
-  if (!forecast || forecast.length === 0) return null;
-
+function computeDailyPoints(forecast: Section[]) {
   const dailyPoints: { dateLabel: string; score: number }[] = [];
 
   forecast.forEach((sec) => {
@@ -153,6 +92,11 @@ function DailyLifeChart({ forecast }: { forecast: Section[] }) {
     });
   });
 
+  return dailyPoints;
+}
+
+function DailyLifeChart({ forecast }: { forecast: Section[] }) {
+  const dailyPoints = computeDailyPoints(forecast);
   if (dailyPoints.length === 0) return null;
 
   const width = Math.max(650, dailyPoints.length * 55);
@@ -200,120 +144,69 @@ function DailyLifeChart({ forecast }: { forecast: Section[] }) {
 }
 
 // -------------------------------------------------------------
-// Component การ์ด 3 กล่อง (พับ/ยุบเก็บไว้เป็นค่าเริ่มต้นเสมอ ไม่มี open)
+// การ์ดคำทำนาย: ถ้อยคำปรับตามภพ แสดงเฉพาะหมวดที่มีข้อมูล
 // -------------------------------------------------------------
-function ItemCardView({ item }: { item: Item }) {
-  const goodList: string[] = [];
-  const warnList: string[] = [];
-  const mixList: string[] = [];
+const GROUPS: { key: keyof Bucket; label: string; cls: string; dot: string }[] = [
+  { key: "good", label: "ดี", cls: "text-emerald-700 dark:text-emerald-300", dot: "bg-emerald-500" },
+  { key: "mixed", label: "ปนกัน", cls: "text-amber-700 dark:text-amber-300", dot: "bg-amber-500" },
+  { key: "bad", label: "ระวัง", cls: "text-red-700 dark:text-red-300", dot: "bg-red-500" },
+  { key: "suit", label: "เหมาะกับ", cls: "text-blue-700 dark:text-blue-300", dot: "bg-blue-500" },
+  { key: "avoid", label: "ควรเลี่ยง", cls: "text-neutral-600 dark:text-neutral-400", dot: "bg-neutral-400" },
+];
 
-  if (item.sub && item.sub.length > 0) {
-    for (const rawText of item.sub) {
-      const t = rawText.trim().replace(/^[•\-\*\s]+/, "");
-
-      if (t.startsWith("ดี:")) {
-        goodList.push(simplifyText(t.replace(/^ดี:\s*/, "")));
-      } else if (t.startsWith("ระวัง:")) {
-        warnList.push(simplifyText(t.replace(/^ระวัง:\s*/, "")));
-      } else if (t.startsWith("กลาง:") || t.startsWith("ผสม:")) {
-        mixList.push(simplifyText(t.replace(/^(กลาง|ผสม):\s*/, "")));
-      } else if (t.includes("มุมให้คุณ") || t.includes("ส่งแรงหนุน") || t.startsWith("[ดี]")) {
-        goodList.push(simplifyText(t.replace(/^\[ดี\]\s*/, "")));
-      } else if (t.includes("มุมให้โทษ") || t.includes("ส่งแรงกด") || t.includes("ระวัง") || t.startsWith("[ร้าย]")) {
-        warnList.push(simplifyText(t.replace(/^\[ร้าย\]\s*/, "")));
-      } else if (t.startsWith("[ผสม]")) {
-        mixList.push(simplifyText(t.replace(/^\[ผสม\]\s*/, "")));
-      } else if (t.length > 0) {
-        if (item.tone === "ดี") goodList.push(simplifyText(t));
-        else if (item.tone === "ร้าย") warnList.push(simplifyText(t));
-        else mixList.push(simplifyText(t));
-      }
-    }
-  }
-
+function Chevron() {
   return (
-    <details className="group rounded-xl border border-neutral-200 bg-white p-3.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-      <summary className="flex w-full cursor-pointer items-center justify-between font-bold text-neutral-900 list-none dark:text-neutral-100">
-        <div>
+    <span className="ml-2 text-lg text-neutral-400 select-none">
+      <span className="inline group-open:hidden">▼</span>
+      <span className="hidden group-open:inline">▲</span>
+    </span>
+  );
+}
+
+function ItemCardView({ item, defaultOpen = false }: { item: Item; defaultOpen?: boolean }) {
+  const b = bucketize(item);
+  const rows = GROUPS.filter((g) => (b[g.key] as string[]).length > 0);
+  return (
+    <details open={defaultOpen} className="group rounded-xl border border-neutral-200 bg-white p-3.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+      <summary className="flex w-full cursor-pointer list-none items-start justify-between text-neutral-900 dark:text-neutral-100">
+        <div className="min-w-0">
           {item.head && (
-            <div className="text-base font-bold">
+            <div className="text-base font-bold leading-snug">
               {item.head}
               <ToneBadge tone={item.tone} />
             </div>
           )}
-          {item.text && (
-            <p className="mt-0.5 text-xs font-medium text-neutral-600 dark:text-neutral-400">
-              {simplifyHeader(item.text)}
-            </p>
+          {(b.verdict || item.text) && (
+            <p className="mt-1 text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">{b.verdict || plainHeader(item.text)}</p>
           )}
         </div>
-        <span className="ml-2 text-lg text-neutral-400 select-none">
-          <span className="inline group-open:hidden">▼</span>
-          <span className="hidden group-open:inline">▲</span>
-        </span>
+        <Chevron />
       </summary>
 
-      <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
-        <div className="flex flex-col rounded-lg border-2 border-emerald-300 bg-emerald-50/60 p-2.5 dark:border-emerald-800 dark:bg-emerald-950/30">
-          <div className="mb-1.5">
-            <span className="inline-block rounded bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white dark:bg-emerald-500">
-              ดี (เรื่องที่เด่น)
-            </span>
-          </div>
-          {goodList.length > 0 ? (
-            <ul className="space-y-1 text-xs text-emerald-950 dark:text-emerald-100 font-medium">
-              {goodList.map((line, idx) => (
-                <li key={idx} className="flex items-start gap-1.5">
-                  <span className="select-none">•</span>
-                  <span>{line}</span>
-                </li>
+      {(rows.length > 0 || b.notes.length > 0) && (
+        <div className="mt-3 flex flex-col gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
+          {rows.map((g) => (
+            <div key={g.key}>
+              <div className={`mb-1 flex items-center gap-1.5 text-sm font-bold ${g.cls}`}>
+                <span className={`inline-block h-2 w-2 rounded-full ${g.dot}`} />
+                {g.label}
+              </div>
+              <ul className="space-y-1 pl-3.5 text-sm leading-relaxed text-neutral-800 dark:text-neutral-200">
+                {(b[g.key] as string[]).map((l, i) => (
+                  <li key={i} className="list-disc">{l}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          {b.notes.length > 0 && (
+            <ul className="space-y-1 pl-3.5 text-xs leading-relaxed text-neutral-500">
+              {b.notes.map((l, i) => (
+                <li key={i} className="list-disc">{l}</li>
               ))}
             </ul>
-          ) : (
-            <div className="py-0.5 text-xs font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
           )}
         </div>
-
-        <div className="flex flex-col rounded-lg border-2 border-amber-300 bg-amber-50/60 p-2.5 dark:border-amber-800 dark:bg-amber-950/30">
-          <div className="mb-1.5">
-            <span className="inline-block rounded bg-amber-500 px-2 py-0.5 text-[11px] font-bold text-white dark:bg-amber-600">
-              ผสม / กลาง (ต้องรอบคอบ)
-            </span>
-          </div>
-          {mixList.length > 0 ? (
-            <ul className="space-y-1 text-xs text-amber-950 dark:text-amber-100 font-medium">
-              {mixList.map((line, idx) => (
-                <li key={idx} className="flex items-start gap-1.5">
-                  <span className="select-none">•</span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="py-0.5 text-xs font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
-          )}
-        </div>
-
-        <div className="flex flex-col rounded-lg border-2 border-red-300 bg-red-50/60 p-2.5 dark:border-red-800 dark:bg-red-950/30">
-          <div className="mb-1.5">
-            <span className="inline-block rounded bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white dark:bg-red-500">
-              ระวัง (สิ่งที่ควรเลี่ยง)
-            </span>
-          </div>
-          {warnList.length > 0 ? (
-            <ul className="space-y-1 text-xs text-red-950 dark:text-red-100 font-medium">
-              {warnList.map((line, idx) => (
-                <li key={idx} className="flex items-start gap-1.5">
-                  <span className="select-none">•</span>
-                  <span>{line}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="py-0.5 text-xs font-semibold text-neutral-400 dark:text-neutral-500">ไม่มี</div>
-          )}
-        </div>
-      </div>
+      )}
     </details>
   );
 }
@@ -321,30 +214,23 @@ function ItemCardView({ item }: { item: Item }) {
 function DetailCardView({ item }: { item: Item }) {
   return (
     <details className="group rounded-xl border border-neutral-200 bg-white p-3.5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
-      <summary className="flex w-full cursor-pointer items-center justify-between font-bold text-neutral-900 list-none dark:text-neutral-100">
-        <div>
+      <summary className="flex w-full cursor-pointer list-none items-start justify-between text-neutral-900 dark:text-neutral-100">
+        <div className="min-w-0">
           {item.head && (
-            <div className="text-base font-bold">
+            <div className="text-base font-bold leading-snug">
               {item.head}
               <ToneBadge tone={item.tone} />
             </div>
           )}
-          {item.text && <p className="mt-0.5 text-xs font-medium text-neutral-600 dark:text-neutral-400">{item.text}</p>}
+          {item.text && <p className="mt-1 text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">{plainHeader(item.text)}</p>}
         </div>
-        <span className="ml-2 text-lg text-neutral-400 select-none">
-          <span className="inline group-open:hidden">▼</span>
-          <span className="hidden group-open:inline">▲</span>
-        </span>
+        <Chevron />
       </summary>
-
       {item.sub && item.sub.length > 0 && (
         <div className="mt-2.5 border-t border-neutral-100 pt-2.5 dark:border-neutral-800">
-          <ul className="space-y-1 text-xs text-neutral-700 dark:text-neutral-300">
+          <ul className="space-y-1.5 pl-3.5 text-sm leading-relaxed text-neutral-700 dark:text-neutral-300">
             {item.sub.map((t, idx) => (
-              <li key={idx} className="flex items-start gap-1.5">
-                <span className="select-none text-neutral-400">•</span>
-                <span>{simplifyText(t)}</span>
-              </li>
+              <li key={idx} className="list-disc">{plainLine(t).text}</li>
             ))}
           </ul>
         </div>
@@ -413,18 +299,34 @@ function processNestedForecast(forecast: Section[]): GroupedYear[] {
   return structuredList;
 }
 
+function retitle(it: Item, isCurrent: boolean): Item {
+  const h = it.head ?? "";
+  let head = h;
+  if (/^วันนี้ ·/.test(h) && !isCurrent) head = h.replace("วันนี้ ·", "วันที่เลือก ·");
+  else if (/^ปีนี้ · อายุเต็ม/.test(h)) head = h.replace("ปีนี้ · ", "ปีนี้ · ภาพรวมโอกาสและอุปสรรค · ");
+  else if (h === "ภาพรวมช่วงนี้") head = "ช่วงนี้ · ภาพรวมแรงหนุนและแรงกดดันจากดาวจร";
+  else if (h.startsWith("ดวงกำเนิด")) head = h.replace("ดวงกำเนิด", "พื้นดวงกำเนิด · นิสัยและจุดเด่น/จุดอ่อน");
+  else if (/^ปีนี้ \(อายุเต็ม/.test(h)) head = h.replace(/^ปีนี้ /, "ปีนี้ตามเกณฑ์อายุ · ดาวเสวยอายุและภพประจำปี ");
+  else if (h === "ดาวจรที่กระทบดวงกำเนิดตอนนี้") head = "ดาวจรช้าที่กระทบดวงกำเนิดตอนนี้ (พฤหัสบดี / เสาร์ ฯลฯ)";
+  else if (h === "ข้อแนะนำ") head = "ข้อแนะนำสำหรับช่วงนี้";
+  return { ...it, head };
+}
+
 export default async function PredictPage({ searchParams }: Props) {
   const sp = await searchParams;
   const hasTime = sp.nt !== "1";
-  const gender: Gender = sp.sex === "m" ? "m" : sp.sex === "f" ? "f" : undefined;
+  const gender: Gender = undefined; // ไม่ใช้เพศในการตีความแล้ว
 
-  const currentDate = new Date();
-  const currentYearBE = currentDate.getFullYear() + 543;
-  const currentMonthNum = currentDate.getMonth() + 1;
+  // วันนี้ตามเวลาไทย (ไม่พึ่งเขตเวลาของ server)
+  const todayTh = new Date(Date.now() + 7 * 3600_000).toISOString().slice(0, 10);
+  const [todayY, todayM] = todayTh.split("-").map(Number);
+  const currentYearBE = todayY + 543;
+  const currentMonthNum = todayM;
 
   const selectedMonth = sp.month ? Number(sp.month) : currentMonthNum;
   const selectedYearBE = sp.year ? Number(sp.year) : currentYearBE;
 
+  const isCurrentMonth = selectedMonth === currentMonthNum && selectedYearBE === currentYearBE;
   const yearOptions = Array.from({ length: 8 }, (_, i) => currentYearBE - 2 + i);
 
   let natal: ChartResult | null = null;
@@ -439,7 +341,8 @@ export default async function PredictPage({ searchParams }: Props) {
 
     const selectedYearAD = selectedYearBE - 543;
     const padMonth = String(selectedMonth).padStart(2, "0");
-    const targetDateStr = `${selectedYearAD}-${padMonth}-01`;
+    // เดือนปัจจุบัน = ใช้วันนี้จริง ; เดือนอื่น = ต้นเดือนที่เลือก
+    const targetDateStr = isCurrentMonth ? todayTh : `${selectedYearAD}-${padMonth}-01`;
 
     const today = parseInput({ date: targetDateStr, place: sp.place });
 
@@ -460,6 +363,33 @@ export default async function PredictPage({ searchParams }: Props) {
 
   // รวบจัดกลุ่มตาม [ปี ➔ เดือน ➔ การ์ดคำทำนาย]
   const nestedForecastData = processNestedForecast(forecast);
+
+  // ข้อมูลสำหรับปุ่มดาวน์โหลด (รูปสรุป + รายงาน)
+  const toLines = (it: Item): string[] => {
+    const b = bucketize(it);
+    const lines: string[] = [];
+    for (const g of GROUPS) for (const l of b[g.key] as string[]) lines.push(`${g.label}: ${l}`);
+    return lines;
+  };
+  const summaryItems: Item[] = reading ? reading.summary.map((it) => retitle(it, isCurrentMonth)) : [];
+  const exportCards: ExportCard[] = reading
+    ? summaryItems.slice(0, 3).map((it) => ({ head: it.head ?? "", text: it.text, tone: it.tone, bucket: bucketize(it) }))
+    : [];
+  const exportSections: ExportSection[] = reading
+    ? [
+        { title: "สรุปภาพรวมอื่น ๆ", items: summaryItems.slice(3).map((it) => ({ head: it.head, text: it.text && plainHeader(it.text), tone: it.tone, lines: (it.sub ?? []).map((t) => plainLine(t).text) })) },
+        ...forecast.map((sec) => ({
+          title: sec.title,
+          note: sec.note,
+          items: sec.items.map((it) => ({ head: it.head, text: it.text && plainHeader(it.text), tone: it.tone, lines: toLines(it).length ? toLines(it) : (it.sub ?? []).map((t) => plainLine(t).text) })),
+        })),
+        ...reading.sections.map((sec) => ({
+          title: sec.title,
+          note: sec.note,
+          items: sec.items.map((it) => ({ head: it.head, text: it.text && plainHeader(it.text), tone: it.tone, lines: (it.sub ?? []).map((t) => plainLine(t).text) })),
+        })),
+      ]
+    : [];
 
   return (
     <main className="mx-auto max-w-3xl p-4 pb-12">
@@ -488,20 +418,6 @@ export default async function PredictPage({ searchParams }: Props) {
                 {p.name}
               </option>
             ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-0.5 text-sm text-neutral-500">
-          เพศ (ใช้ตีความภพ ๔ และ ๙)
-          <select name="sex" defaultValue={sp.sex || ""} className={inputCls}>
-            <option value="" className="text-black">
-              ไม่ระบุ
-            </option>
-            <option value="m" className="text-black">
-              ชาย
-            </option>
-            <option value="f" className="text-black">
-              หญิง
-            </option>
           </select>
         </label>
 
@@ -555,8 +471,17 @@ export default async function PredictPage({ searchParams }: Props) {
             {hasTime ? ` เวลา ${natal.datetime_th.split(" ")[1].slice(0, 5)} น.` : " (ไม่ทราบเวลา)"} · {natal.location.name}
           </p>
 
-          {/* 1. สรุปภาพรวมดวงชะตา (พับเก็บไว้เป็นค่าเริ่มต้น) */}
-          <details className="group rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
+          <PredictExport
+            title="คำทำนายจากวันเกิด (ระบบพลูหลวง)"
+            subtitle={`เกิด ${thaiDate(natal.datetime_th.split(" ")[0])}${hasTime ? ` เวลา ${natal.datetime_th.split(" ")[1].slice(0, 5)} น.` : ""} · ${natal.location.name}`}
+            cards={exportCards}
+            graph={computeDailyPoints(forecast)}
+            sections={exportSections}
+            fileBase={`predict-${natal.datetime_th.split(" ")[0]}`}
+          />
+
+          {/* 1. สรุปภาพรวมดวงชะตา (เปิดไว้เป็นค่าเริ่มต้น) */}
+          <details open className="group rounded-xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
             <summary className="flex w-full cursor-pointer items-center justify-between text-lg font-bold text-neutral-900 list-none dark:text-neutral-100">
               <span>📌 สรุปภาพรวมดวงชะตา (วันนี้ / เดือนนี้ / ปีนี้)</span>
               <span className="ml-2 text-xl text-neutral-400 select-none">
@@ -565,8 +490,8 @@ export default async function PredictPage({ searchParams }: Props) {
               </span>
             </summary>
             <div className="mt-3 flex flex-col gap-3 border-t border-neutral-100 pt-3 dark:border-neutral-800">
-              {reading.summary.map((it, i) => (
-                <ItemCardView key={`sum-${i}`} item={it} />
+              {summaryItems.map((it, i) => (
+                <ItemCardView key={`sum-${i}`} item={it} defaultOpen={i < 3} />
               ))}
             </div>
           </details>
