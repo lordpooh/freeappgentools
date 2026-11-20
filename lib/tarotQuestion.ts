@@ -10,7 +10,7 @@ export type QuestionReading = {
   lines: string[]; // รายละเอียดที่โยงกับไพ่
 };
 
-const SCORE: Record<Tone, number> = { ดี: 1, กลาง: 0, ร้าย: -1 };
+const SCORE: Record<Tone, number> = { ดี: 1, กลาง: 0, ระวัง: -1 };
 
 type QKind = "yesno" | "choice" | "timing" | "why" | "how" | "general";
 
@@ -58,7 +58,7 @@ export function readQuestion(r: SpreadResult): QuestionReading | null {
   if (kind === "timing") {
     const fast = /(Knight|Eight|Ace|Page)/.test(outcome.card.en);
     verdict =
-      outcome.tone === "ร้าย" || outcome.reversed
+      outcome.tone === "ระวัง" || outcome.reversed
         ? "ยังต้องรออีกพัก ควรเตรียมตัวและแก้อุปสรรคก่อน"
         : fast
           ? "ค่อนข้างใกล้ เหตุการณ์น่าจะเคลื่อนไหวเร็ว"
