@@ -21,10 +21,10 @@ const SUIT_STYLE: Record<
   (typeof SUITS)[number],
   { glyph: string; bg: string; fg: string }
 > = {
-  wands: { glyph: "♣", bg: "#fff4e6", fg: "#c2410c" },
-  cups: { glyph: "♥", bg: "#eef6ff", fg: "#1d4ed8" },
-  swords: { glyph: "♠", bg: "#f1f5f9", fg: "#334155" },
-  pentacles: { glyph: "♦", bg: "#f3f9ee", fg: "#4d7c0f" },
+    wands: { glyph: "🪄", bg: "#fff4e6", fg: "#c2410c" },
+    cups: { glyph: "🏆", bg: "#eef6ff", fg: "#1d4ed8" },
+    swords: { glyph: "🗡️", bg: "#f1f5f9", fg: "#334155" },
+    pentacles: { glyph: "🪙", bg: "#f3f9ee", fg: "#4d7c0f" },
 };
 
 const PIPS: Record<number, [number, number][]> = {
