@@ -1,5 +1,22 @@
 "use client";
+import type { Metadata } from "next";
 
+export const metadata: Metadata = {
+  title: "ทำนายไพ่ทาโร่ออนไลน์ฟรี - เปิดไพ่ยิปซีแม่นๆ ไม่ต้องสมัครสมาชิก",
+  description:
+    "ดูดวงไพ่ทาโร่ออนไลน์ฟรี เปิดไพ่ยิปซีทำนายความรัก การงาน การเงิน ใช้งานได้ทันทีโดยไม่ต้องลงทะเบียน",
+  keywords: [
+    "ทำนายไพ่ทาโร่",
+    "ดูดวงไพ่ทาโร่",
+    "เปิดไพ่ยิปซีออนไลน์",
+    "ดูดวงไพ่ยิปซีฟรี",
+  ],
+  openGraph: {
+    title: "ทำนายไพ่ทาโร่ออนไลน์ฟรี | FreeAppGenTools",
+    description: "เปิดไพ่ยิปซีทำนายดวงชะตาฟรี ไม่ต้องสมัครสมาชิก ใช้งานได้ทันที",
+    url: "https://freeappgentools.com/tarot",
+  },
+};
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {

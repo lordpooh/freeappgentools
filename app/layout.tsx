@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-// 1. import GoogleAnalytics เข้ามา
 import { GoogleAnalytics } from "@next/third-parties/google";
 
 const geistSans = Geist({
@@ -15,24 +14,30 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FreeAppGenTools - สร้าง QR Code ฟรี & เช็กดวงชะติตามลัคนาเกิด ไม่ต้องสมัครสมาชิก",
-  description: "เครื่องมือออนไลน์ฟรี 100% ทั้งสร้าง QR Code ไม่ติดลายน้ำ และคำนวณผูกดวงหาลัคนาเกิดจริง ทำนายดวงชะตาล่วงหน้า 1 เดือนถึง 1 ปี ไม่ต้องลงทะเบียน ใช้งานได้ทันที ปลอดภัย",
+  title: {
+    default: "FreeAppGenTools - สร้าง QR Code ฟรี, เช็กดวงลัคนาเกิด & ดูดวงไพ่ทาโร่",
+    template: "%s | FreeAppGenTools",
+  },
+  description:
+    "เครื่องมือออนไลน์ฟรี 100% สร้าง QR Code ไม่ติดลายน้ำ คำนวณผูกดวงหาลัคนาเกิดจริง ทำนายดวงล่วงหน้า และดูดวงไพ่ทาโร่ออนไลน์ ไม่ต้องสมัครสมาชิก ใช้งานได้ทันที",
   keywords: [
-    "สร้าง QR Code ฟรี", 
-    "สร้าง QR Code ไม่ต้องลงทะเบียน", 
-    "สร้าง QR Code ไม่ต้องสมัครสมาชิก", 
-    "free qr code generator no signup", 
-    "เช็กดวงชะติตามลัคนาเกิด",
+    "สร้าง QR Code ฟรี",
+    "สร้าง QR Code ไม่ต้องลงทะเบียน",
+    "สร้าง QR Code ไม่ต้องสมัครสมาชิก",
+    "free qr code generator no signup",
+    "เช็กดวงชะตาตามลัคนาเกิด",
     "หาลัคนาเกิดจริง",
     "ทำนายดวงล่วงหน้า",
-    "ทำนายดวงล่วงหน้า 1 เดือน",
-    "ทำนายดวงล่วงหน้า 1 ปี",
+    "ทำนายไพ่ทาโร่",
+    "ดูดวงไพ่ทาโร่ออนไลน์ฟรี",
+    "เปิดไพ่ยิปซี",
     "ดูดวงฟรีไม่ต้องสมัครสมาชิก",
-    "FreeAppGenTools"
+    "FreeAppGenTools",
   ],
   openGraph: {
-    title: "FreeAppGenTools - สร้าง QR Code ฟรี & ค้นหาลัคนาเกิด ทำนายดวงล่วงหน้า",
-    description: "รวมเครื่องมือออนไลน์ฟรี ไม่ว่าจะเป็นการสร้าง QR Code หรือคำนวณลัคนาเกิดตามเวลาจริง พร้อมทำนายดวงชะตาล่วงหน้า 1 เดือน - 1 ปี ไม่ต้องลงทะเบียน ดาวน์โหลด/ใช้งานได้ทันที",
+    title: "FreeAppGenTools - สร้าง QR Code ฟรี, ค้นหาลัคนาเกิด & ทำนายไพ่ทาโร่",
+    description:
+      "รวมเครื่องมือออนไลน์ฟรี สร้าง QR Code คำนวณลัคนาเกิด และทำนายดวงไพ่ทาโร่ออนไลน์ ไม่ต้องลงทะเบียน ใช้งานได้ทันที",
     url: "https://freeappgentools.com",
     siteName: "FreeAppGenTools",
     type: "website",
@@ -42,12 +47,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
-      lang="en"
+      lang="th"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         {children}
-        {/* 2. แทรกส่วนนี้เข้าไปก่อนปิด </body> (อย่าลืมเปลี่ยน G-XXXXXXXXXX เป็น ID จริง) */}
         <GoogleAnalytics gaId="G-KYKHVFKJEH" />
       </body>
     </html>
