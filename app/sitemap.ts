@@ -1,19 +1,10 @@
-import { MetadataRoute } from 'next';
+import type { MetadataRoute } from "next";
 
 export default function sitemap(): MetadataRoute.Sitemap {
+  const base = "https://freeappgentools.com";
   return [
-    {
-      url: 'https://freeappgentools.com',
-      lastModified: new Date(),
-      changeFrequency: 'daily',
-      priority: 1.0,
-    },
-    // หากอนาคตมีหน้าอื่นเพิ่ม สามารถต่อท้ายได้ที่นี่ เช่น:
-    // {
-    //   url: 'https://freeappgentools.com/qr-generator',
-    //   lastModified: new Date(),
-    //   changeFrequency: 'weekly',
-    //   priority: 0.8,
-    // },
+    { url: base, changeFrequency: "weekly", priority: 1 },
+    { url: `${base}/tarot`, changeFrequency: "monthly", priority: 0.9 },
+
   ];
 }

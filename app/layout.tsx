@@ -14,6 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://freeappgentools.com"),
   title: {
     default: "FreeAppGenTools - สร้าง QR Code ฟรี, เช็กดวงลัคนาเกิด & ดูดวงไพ่ทาโร่",
     template: "%s | FreeAppGenTools",
