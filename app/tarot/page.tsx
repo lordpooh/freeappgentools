@@ -1,22 +1,5 @@
 "use client";
-import type { Metadata } from "next";
 
-export const metadata: Metadata = {
-  title: "ทำนายไพ่ทาโร่ออนไลน์ฟรี - เปิดไพ่ยิปซีแม่นๆ ไม่ต้องสมัครสมาชิก",
-  description:
-    "ดูดวงไพ่ทาโร่ออนไลน์ฟรี เปิดไพ่ยิปซีทำนายความรัก การงาน การเงิน ใช้งานได้ทันทีโดยไม่ต้องลงทะเบียน",
-  keywords: [
-    "ทำนายไพ่ทาโร่",
-    "ดูดวงไพ่ทาโร่",
-    "เปิดไพ่ยิปซีออนไลน์",
-    "ดูดวงไพ่ยิปซีฟรี",
-  ],
-  openGraph: {
-    title: "ทำนายไพ่ทาโร่ออนไลน์ฟรี | FreeAppGenTools",
-    description: "เปิดไพ่ยิปซีทำนายดวงชะตาฟรี ไม่ต้องสมัครสมาชิก ใช้งานได้ทันที",
-    url: "https://freeappgentools.com/tarot",
-  },
-};
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -42,7 +25,6 @@ const TONE_STYLE: Record<Tone, { badge: string; bar: string }> = {
   ระวัง: { badge: "bg-rose-100 text-rose-700", bar: "bg-rose-500" },
 };
 
-// กัน crash ถ้า tone เป็นค่าที่ไม่ตรงกับ key ด้านบน (เช่น ตัวอักษรไทยต่างรหัส) ให้ใช้สไตล์กลางแทน
 const FALLBACK_TONE = { badge: "bg-slate-100 text-slate-600", bar: "bg-slate-400" };
 function toneStyle(tone: Tone) {
   return TONE_STYLE[tone] ?? FALLBACK_TONE;
@@ -61,7 +43,6 @@ const SUIT_GLYPH: Record<string, string> = {
   pentacles: "🪙",
 };
 
-// ท่าทางของไพ่ 3 ใบในกองตอนสับ [พัก, สลับไปมา]
 const STACK_REST = ["translate(0px,0px) rotate(0deg)", "translate(0px,-3px) rotate(0deg)", "translate(0px,-6px) rotate(0deg)"];
 const STACK_SHUFFLE_A = ["translate(-34px,0px) rotate(-9deg)", "translate(34px,-3px) rotate(9deg)", "translate(-16px,-6px) rotate(-4deg)"];
 
@@ -74,26 +55,23 @@ const PRINT_CSS = `
 }
 `;
 
-// ขนาดหน้า A4 แนวตั้งที่ 150 dpi
 const A4_W = 1240;
 const A4_H = 1754;
 const MARGIN = 50;
 const FOOTER = 40;
-const MAX_CANVAS_AREA = 16_000_000; // กัน canvas ใหญ่เกินจน iOS Safari สร้างไม่ได้
+const MAX_CANVAS_AREA = 16_000_000;
 
 type PageImg = { url: string; file: File };
 
-export default function TarotPage() {
+export default function TarotClient() {
   const [topic, setTopic] = useState<Topic>("today");
   const [kind, setKind] = useState<SpreadKind>("four");
   const [question, setQuestion] = useState("");
 
-  // ขั้นสับไพ่
   const [deck, setDeck] = useState<Card[] | null>(null);
   const [shuffleCount, setShuffleCount] = useState(0);
   const [shuffling, setShuffling] = useState(false);
 
-  // ขั้นเปิดไพ่
   const [result, setResult] = useState<SpreadResult | null>(null);
   const [revealed, setRevealed] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -160,7 +138,6 @@ export default function TarotPage() {
     a.remove();
   }
 
-  // สร้างรูป A4 (แนวตั้ง) ถ้ายาวเกินหนึ่งหน้าจะแบ่งหน้าตามขอบบล็อก ไม่ตัดกลางการ์ด
   async function saveImage() {
     const el = reportRef.current;
     if (!el || saving) return;
@@ -171,10 +148,9 @@ export default function TarotPage() {
 
       const cssW = el.offsetWidth;
       const cssH = el.offsetHeight;
-      const target = (A4_W - MARGIN * 2) / cssW; // px ของ A4 ต่อ 1 CSS px
+      const target = (A4_W - MARGIN * 2) / cssW;
       const used = Math.min(target, Math.sqrt(MAX_CANVAS_AREA / (cssW * cssH)));
 
-      // จุดตัดหน้าที่เป็นไปได้ = ขอบล่างของบล็อกหลัก และของการ์ดแต่ละใบ
       const top0 = el.getBoundingClientRect().top;
       const cuts = Array.from(
         el.querySelectorAll<HTMLElement>(":scope > *, :scope > ul > li, :scope > div > div"),
@@ -183,7 +159,7 @@ export default function TarotPage() {
         .filter((y) => y > 0 && y < cssH)
         .sort((a, b) => a - b);
 
-      const pageCss = (A4_H - MARGIN * 2 - FOOTER) / target; // ความสูงเนื้อหาต่อหน้า (CSS px)
+      const pageCss = (A4_H - MARGIN * 2 - FOOTER) / target;
       const slices: [number, number][] = [];
       let start = 0;
       while (start < cssH - 1) {
@@ -194,7 +170,7 @@ export default function TarotPage() {
         }
         let end = 0;
         for (const c of cuts) if (c > start + 40 && c <= limit) end = c;
-        if (!end) end = limit; // บล็อกเดียวสูงเกินหน้า ตัดตามความสูงหน้า
+        if (!end) end = limit;
         slices.push([start, end]);
         start = end;
       }
@@ -202,7 +178,7 @@ export default function TarotPage() {
       const full = await toCanvas(el, {
         pixelRatio: used,
         backgroundColor: "#ffffff",
-        skipFonts: true, // กัน error จาก stylesheet/ฟอนต์ข้ามโดเมน
+        skipFonts: true,
       });
       const ratio = full.width / cssW;
       const stamp = fileStamp();
@@ -263,7 +239,6 @@ export default function TarotPage() {
     }
   }
 
-  // มือถือ: เปิดหน้าต่างแชร์ของระบบ เลือก "บันทึกรูปภาพ" เพื่อเก็บลงอัลบั้ม
   async function sharePages() {
     if (!pages) return;
     const files = pages.map((p) => p.file);
@@ -291,7 +266,6 @@ export default function TarotPage() {
     }
   }
 
-  // เซฟเป็นรายงานข้อความ .txt
   function saveText() {
     if (!result) return;
     const L: string[] = [];
@@ -815,21 +789,17 @@ export default function TarotPage() {
                 {saveError}
               </p>
             )}
-            <ul className="space-y-3">
+            <div className="space-y-3">
               {pages.map((p, i) => (
-                <li key={p.url}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div key={i} className="border rounded-lg overflow-hidden">
                   <img
                     src={p.url}
-                    alt={`รายงานหน้า ${i + 1}`}
-                    className="w-full border border-slate-200 rounded shadow-sm"
+                    alt={`หน้ารายงาน ${i + 1}`}
+                    className="w-full h-auto block"
                   />
-                  <p className="text-[11px] text-slate-400 text-center mt-1">
-                    หน้า {i + 1}/{pages.length}
-                  </p>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           </div>
         </div>
       )}
