@@ -21,8 +21,6 @@ export type OpportunityReading = {
   rows: OppRow[];
 };
 
-export type Tone =  'ดี' | 'กลาง' | 'ระวัง';
-
 const SCORE: Record<Tone, number> = { ดี: 1, กลาง: 0, ระวัง: -1 };
 
 /* ───────────── โอกาสแบบไหน ───────────── */
